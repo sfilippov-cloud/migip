@@ -1,0 +1,9 @@
+name: sample-react
+services:
+- build_command: pnpm run build
+  environment_slug: node-js
+  github:
+    branch: pnpm-support 
+    deploy_on_push: true
+    repo: fumblehool/sample-react
+  name: sample-react
