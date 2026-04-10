@@ -47,11 +47,27 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return null;
         }
 
-        const user = await prisma.users.findFirst({
-          where: { email: credentials.email as string },
-          include: { user_group: true },
-        });
+        // Use raw SQL since user_group has no PK (@@ignore in Prisma)
+        const results = await prisma.$queryRaw<
+          {
+            id: number;
+            email: string;
+            name: string | null;
+            password: string;
+            category: number | null;
+            user_group_id: number | null;
+            group_name: string | null;
+          }[]
+        >`
+          SELECT u.id, u.email, u.name, u.password, u.category,
+                 u.user_group_id, ug.name as group_name
+          FROM users u
+          LEFT JOIN user_group ug ON ug.id = u.user_group_id
+          WHERE u.email = ${credentials.email as string}
+          LIMIT 1
+        `;
 
+        const user = results[0];
         if (!user || !user.password) {
           return null;
         }
@@ -78,7 +94,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           name: user.name ?? "",
           category: user.category,
           userGroupId: user.user_group_id ?? 2,
-          groupName: user.user_group?.name ?? "viewer",
+          groupName: user.group_name ?? "viewer",
         };
       },
     }),

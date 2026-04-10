@@ -11,8 +11,8 @@ type User = {
   password: string | null;
   category: number | null;
   user_group_id: number | null;
-  user_group: { id: number; name: string | null } | null;
-  category_ref: { id: number; name: string | null; description: string | null } | null;
+  group_name: string | null;
+  category_name: string | null;
 };
 
 type UserGroup = { id: number; name: string | null };
@@ -71,16 +71,16 @@ export function UsersClient({ users, userGroups, categories }: UsersClientProps)
                 <td className="px-4 py-3">{user.id}</td>
                 <td className="px-4 py-3 font-medium">{user.name}</td>
                 <td className="px-4 py-3">{user.email}</td>
-                <td className="px-4 py-3">{user.category_ref?.name ?? "—"}</td>
+                <td className="px-4 py-3">{user.category_name ?? "—"}</td>
                 <td className="px-4 py-3">
                   <span
                     className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                      user.user_group?.name === "admin"
+                      user.group_name === "admin"
                         ? "bg-purple-100 text-purple-700"
                         : "bg-blue-100 text-blue-700"
                     }`}
                   >
-                    {user.user_group?.name ?? "viewer"}
+                    {user.group_name ?? "viewer"}
                   </span>
                 </td>
                 <td className="px-4 py-3">

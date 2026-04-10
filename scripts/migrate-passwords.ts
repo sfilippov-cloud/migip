@@ -2,7 +2,9 @@
  * One-time migration script: hash all plain-text passwords with bcrypt.
  *
  * Usage:
- *   npx tsx scripts/migrate-passwords.ts
+ *   npx dotenv -e .env -- tsx scripts/migrate-passwords.ts
+ *   OR
+ *   npx tsx scripts/migrate-passwords.ts  (if DATABASE_URL is exported in shell)
  *
  * This script:
  * 1. Reads all users from the database
@@ -11,6 +13,7 @@
  * 4. Updates the user record
  */
 
+import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 

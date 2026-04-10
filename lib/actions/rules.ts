@@ -148,7 +148,8 @@ export async function updateRule(
   }
 
   // Re-embed
-  await prisma.rule_embeddings.deleteMany({ where: { rule_uid: ruleUid } });
+  // rule_embeddings uses vector type — use raw SQL
+  await prisma.$executeRaw`DELETE FROM rule_embeddings WHERE rule_uid = ${ruleUid}`;
   await triggerAiEmbed(ruleUid);
 
   revalidatePath("/rules");
@@ -192,7 +193,8 @@ export async function updatePersonalRule(
     });
   }
 
-  await prisma.rule_embeddings.deleteMany({ where: { rule_uid: ruleUid } });
+  // rule_embeddings uses vector type — use raw SQL
+  await prisma.$executeRaw`DELETE FROM rule_embeddings WHERE rule_uid = ${ruleUid}`;
   await triggerAiEmbed(ruleUid);
 
   revalidatePath("/personal");
@@ -219,7 +221,11 @@ export async function toggleArchive(ruleUid: number, currentStatusId: number) {
 export async function deleteRule(ruleUid: number) {
   await requireAdmin();
 
-  // Cascade deletes handle rule_applies_to and rule_embeddings
+  // Delete embeddings first (no FK cascade, uses vector type)
+  await prisma.$executeRaw`DELETE FROM rule_embeddings WHERE rule_uid = ${ruleUid}`;
+  // rule_applies_to cascades via FK, but delete explicitly to be safe
+  await prisma.rule_applies_to.deleteMany({ where: { rule_uid: ruleUid } });
+  // Delete the rule
   await prisma.rules.delete({ where: { rule_uid: ruleUid } });
 
   revalidatePath("/rules");
