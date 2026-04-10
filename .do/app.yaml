@@ -1,0 +1,48 @@
+alerts:
+- rule: DEPLOYMENT_FAILED
+- rule: DOMAIN_FAILED
+domains:
+- domain: migipdocs.ru
+  type: PRIMARY
+  zone: migipdocs.ru
+envs:
+- key: DATABASE_URL
+  scope: RUN_AND_BUILD_TIME
+  value: placeholder
+- key: NEXTAUTH_SECRET
+  scope: RUN_AND_BUILD_TIME
+  value: placeholder
+- key: NEXTAUTH_URL
+  scope: RUN_AND_BUILD_TIME
+  value: https://migipdocs.ru
+- key: N8N_AI_EMBED_URL
+  scope: RUN_AND_BUILD_TIME
+  value: https://n8n.wingform.cloud/webhook/b631454d-3cbf-43d1-8de9-495d4d4fccea
+- key: N8N_AI_IMPROVE_URL
+  scope: RUN_AND_BUILD_TIME
+  value: https://n8n.wingform.cloud/webhook/8b209c67-f40e-402f-9bee-4628d42a526c
+- key: N8N_AI_CHAT_URL
+  scope: RUN_AND_BUILD_TIME
+  value: https://n8n.wingform.cloud/webhook/d8d555b5-0416-4f1f-b126-3403f15d05c8/chat
+ingress:
+  rules:
+  - component:
+      name: migip
+    match:
+      authority:
+        exact: ""
+      path:
+        prefix: /
+name: migipdocs
+region: fra
+services:
+- dockerfile_path: Dockerfile
+  github:
+    branch: main
+    deploy_on_push: true
+    repo: sfilippov-cloud/migip
+  http_port: 3000
+  instance_count: 1
+  instance_size_slug: apps-s-1vcpu-1gb
+  name: migip
+  source_dir: /
