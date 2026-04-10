@@ -14,6 +14,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 RUN npx prisma generate
+RUN npx prisma db push --skip-generate --accept-data-loss || echo "Warning: prisma db push failed (DATABASE_URL may not be available at build time)"
 RUN npm run build
 
 # --- Stage 3: Production ---
@@ -32,16 +33,8 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 
-# Copy prisma schema + full node_modules for prisma db push at startup
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules ./node_modules
-
-# Entrypoint script: migrate then start
-COPY --from=builder /app/entrypoint.sh ./entrypoint.sh
-USER root
-RUN chmod +x entrypoint.sh
 USER nextjs
 
 EXPOSE 3000
 
-ENTRYPOINT ["./entrypoint.sh"]
+CMD ["node", "server.js"]
