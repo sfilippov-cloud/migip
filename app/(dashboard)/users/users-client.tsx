@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { createUser, updateUser, deleteUser } from "@/lib/actions/users";
+import { Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 type User = {
@@ -42,37 +43,37 @@ export function UsersClient({ users, userGroups, categories }: UsersClientProps)
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Пользователи</h1>
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-xl font-bold lg:text-2xl">Пользователи</h1>
         <button
           onClick={() => setShowAddDialog(true)}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 lg:px-4 lg:py-2"
         >
           Добавить
         </button>
       </div>
 
-      <div className="overflow-auto rounded-lg border">
+      <div className="min-h-0 flex-1 overflow-auto rounded-lg border">
         <table className="w-full text-left text-sm">
           <thead className="border-b bg-gray-50 text-xs font-medium uppercase text-gray-500">
             <tr>
-              <th className="px-4 py-3">ID</th>
-              <th className="px-4 py-3">Имя</th>
-              <th className="px-4 py-3">Email</th>
-              <th className="px-4 py-3">Категория</th>
-              <th className="px-4 py-3">Роль</th>
-              <th className="px-4 py-3">Действия</th>
+              <th className="hidden px-4 py-3 sm:table-cell">ID</th>
+              <th className="px-3 py-3 lg:px-4">Имя</th>
+              <th className="hidden px-4 py-3 md:table-cell">Email</th>
+              <th className="hidden px-4 py-3 sm:table-cell">Категория</th>
+              <th className="px-3 py-3 lg:px-4">Роль</th>
+              <th className="w-10 px-2 py-3"></th>
             </tr>
           </thead>
           <tbody className="divide-y">
             {users.map((user) => (
               <tr key={user.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3">{user.id}</td>
-                <td className="px-4 py-3 font-medium">{user.name}</td>
-                <td className="px-4 py-3">{user.email}</td>
-                <td className="px-4 py-3">{user.category_name ?? "—"}</td>
-                <td className="px-4 py-3">
+                <td className="hidden px-4 py-3 sm:table-cell">{user.id}</td>
+                <td className="px-3 py-3 font-medium lg:px-4">{user.name}</td>
+                <td className="hidden px-4 py-3 md:table-cell">{user.email}</td>
+                <td className="hidden px-4 py-3 sm:table-cell">{user.category_name ?? "—"}</td>
+                <td className="px-3 py-3 lg:px-4">
                   <span
                     className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
                       user.group_name === "admin"
@@ -87,16 +88,18 @@ export function UsersClient({ users, userGroups, categories }: UsersClientProps)
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => setEditingUser(user)}
-                      className="rounded px-2 py-1 text-xs hover:bg-gray-100"
+                      className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                      title="Редактировать"
                     >
-                      Изм.
+                      <Pencil className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => handleDelete(user.id)}
-                      className="rounded px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                      className="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600"
                       disabled={isPending}
+                      title="Удалить"
                     >
-                      Уд.
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
                 </td>
@@ -188,7 +191,7 @@ function UserDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+      <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-xl sm:p-6">
         <h2 className="mb-4 text-lg font-semibold">
           {mode === "add" ? "Добавить пользователя" : "Редактировать пользователя"}
         </h2>

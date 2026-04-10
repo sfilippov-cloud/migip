@@ -1,8 +1,21 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { createRule, updateRule, improveTextWithAi } from "@/lib/actions/rules";
+import { createRule, updateRule, deleteRule, toggleArchive, improveTextWithAi } from "@/lib/actions/rules";
+import { X, Sparkles, Archive, ArchiveRestore, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+
+function formatAiResponse(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\n\n/g, "</p><p>")
+    .replace(/\n/g, "<br/>")
+    .replace(/^/, "<p>")
+    .replace(/$/, "</p>");
+}
 
 type Rule = {
   rule_uid: number;
@@ -35,9 +48,10 @@ interface RuleDialogProps {
   decisionBodies: DecisionBody[];
   categories: Category[];
   groupId: number;
+  isAdmin?: boolean;
   defaultSectionId?: number;
   defaultTypeId?: number;
-  onClose: () => void;
+  onClose: (didMutate?: boolean) => void;
 }
 
 export function RuleDialog({
@@ -48,11 +62,13 @@ export function RuleDialog({
   decisionBodies,
   categories,
   groupId,
+  isAdmin,
   defaultSectionId,
   defaultTypeId,
   onClose,
 }: RuleDialogProps) {
-  const [isPending, startTransition] = useTransition();
+  const [isSaving, startSaveTransition] = useTransition();
+  const [isAiChecking, setIsAiChecking] = useState(false);
   const [aiResponse, setAiResponse] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
@@ -75,7 +91,7 @@ export function RuleDialog({
       return;
     }
 
-    startTransition(async () => {
+    startSaveTransition(async () => {
       try {
         if (mode === "add") {
           await createRule({
@@ -104,22 +120,51 @@ export function RuleDialog({
           });
           toast.success("Правило обновлено");
         }
-        onClose();
+        onClose(true);
       } catch {
         toast.error("Ошибка при сохранении");
       }
     });
   }
 
-  function handleAiCheck() {
-    startTransition(async () => {
+  function handleArchive() {
+    if (!rule) return;
+    startSaveTransition(async () => {
+      try {
+        await toggleArchive(rule.rule_uid, rule.status_id!);
+        toast.success(rule.status_id === 1 ? "Правило архивировано" : "Правило восстановлено");
+        onClose(true);
+      } catch {
+        toast.error("Ошибка при изменении статуса");
+      }
+    });
+  }
+
+  function handleDelete() {
+    if (!rule || !confirm("Вы уверены, что хотите удалить это правило?")) return;
+    startSaveTransition(async () => {
+      try {
+        await deleteRule(rule.rule_uid);
+        toast.success("Правило удалено");
+        onClose(true);
+      } catch {
+        toast.error("Ошибка при удалении");
+      }
+    });
+  }
+
+  async function handleAiCheck() {
+    setIsAiChecking(true);
+    try {
       const result = await improveTextWithAi(formData.text);
       if (result.error) {
         toast.error(result.error);
       } else {
-        setAiResponse(JSON.stringify(result.result, null, 2));
+        setAiResponse(result.result?.output ?? JSON.stringify(result.result, null, 2));
       }
-    });
+    } finally {
+      setIsAiChecking(false);
+    }
   }
 
   function toggleCategory(catId: number) {
@@ -132,219 +177,261 @@ export function RuleDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-lg bg-white p-6 shadow-xl">
-        <h2 className="mb-4 text-lg font-semibold">
-          {mode === "add" ? "Добавить правило" : "Редактировать правило"}
-        </h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4">
+      <div className={`flex max-h-full w-full flex-col overflow-hidden rounded-lg bg-white shadow-xl sm:max-h-[90vh] lg:flex-row ${aiResponse ? "lg:max-w-6xl" : "lg:max-w-2xl"} transition-all`}>
 
-        <div className="space-y-4">
-          {/* ID and Sub-ID */}
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <label className="mb-1 block text-sm font-medium">Пункт</label>
-              <input
-                type="number"
-                value={formData.id}
-                onChange={(e) =>
-                  setFormData({ ...formData, id: Number(e.target.value) })
-                }
-                className="w-full rounded-md border px-3 py-2 text-sm"
-              />
-            </div>
-            <div className="flex-1">
-              <label className="mb-1 block text-sm font-medium">Подпункт</label>
-              <input
-                type="number"
-                value={formData.subId}
-                onChange={(e) =>
-                  setFormData({ ...formData, subId: Number(e.target.value) })
-                }
-                className="w-full rounded-md border px-3 py-2 text-sm"
-              />
-            </div>
-          </div>
+        {/* Left: Form */}
+        <div className="flex min-w-0 flex-1 flex-col overflow-auto p-4 sm:p-6">
+          <h2 className="mb-4 text-lg font-semibold">
+            {mode === "add" ? "Добавить правило" : "Редактировать правило"}
+          </h2>
 
-          {/* Section and Type (only for add mode of organizational rules) */}
-          {mode === "add" && groupId === 1 && (
+          <div className="space-y-4">
+            {/* ID and Sub-ID */}
             <div className="flex gap-4">
               <div className="flex-1">
-                <label className="mb-1 block text-sm font-medium">Раздел</label>
+                <label className="mb-1 block text-sm font-medium">Пункт</label>
+                <input
+                  type="number"
+                  value={formData.id}
+                  onChange={(e) =>
+                    setFormData({ ...formData, id: Number(e.target.value) })
+                  }
+                  className="w-full rounded-md border px-3 py-2 text-sm"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="mb-1 block text-sm font-medium">Подпункт</label>
+                <input
+                  type="number"
+                  value={formData.subId}
+                  onChange={(e) =>
+                    setFormData({ ...formData, subId: Number(e.target.value) })
+                  }
+                  className="w-full rounded-md border px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Section and Type (only for add mode of organizational rules) */}
+            {mode === "add" && groupId === 1 && (
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="mb-1 block text-sm font-medium">Раздел</label>
+                  <select
+                    value={formData.sectionId}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        sectionId: Number(e.target.value),
+                      })
+                    }
+                    className="w-full rounded-md border px-3 py-2 text-sm"
+                  >
+                    {sections.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.id}. {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex-1">
+                  <label className="mb-1 block text-sm font-medium">Тип</label>
+                  <select
+                    value={formData.ruleTypeId}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        ruleTypeId: Number(e.target.value),
+                      })
+                    }
+                    className="w-full rounded-md border px-3 py-2 text-sm"
+                  >
+                    {ruleTypes.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.id}. {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {/* Persona (for personal decisions) */}
+            {groupId === 2 && (
+              <div>
+                <label className="mb-1 block text-sm font-medium">Персона</label>
+                <input
+                  type="text"
+                  value={formData.persona}
+                  onChange={(e) =>
+                    setFormData({ ...formData, persona: e.target.value })
+                  }
+                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  placeholder="ФИО"
+                />
+              </div>
+            )}
+
+            {/* Decision body and date */}
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <label className="mb-1 block text-sm font-medium">
+                  Орган решения
+                </label>
                 <select
-                  value={formData.sectionId}
+                  value={formData.decisionBodyId ?? ""}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      sectionId: Number(e.target.value),
+                      decisionBodyId: e.target.value
+                        ? Number(e.target.value)
+                        : null,
                     })
                   }
                   className="w-full rounded-md border px-3 py-2 text-sm"
                 >
-                  {sections.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.id}. {s.name}
+                  <option value="">Не указано</option>
+                  {decisionBodies.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.code} — {b.name}
                     </option>
                   ))}
                 </select>
               </div>
               <div className="flex-1">
-                <label className="mb-1 block text-sm font-medium">Тип</label>
-                <select
-                  value={formData.ruleTypeId}
+                <label className="mb-1 block text-sm font-medium">
+                  Дата решения
+                </label>
+                <input
+                  type="date"
+                  value={formData.decisionDate}
                   onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      ruleTypeId: Number(e.target.value),
-                    })
+                    setFormData({ ...formData, decisionDate: e.target.value })
                   }
                   className="w-full rounded-md border px-3 py-2 text-sm"
-                >
-                  {ruleTypes.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.id}. {t.name}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
             </div>
-          )}
 
-          {/* Persona (for personal decisions) */}
-          {groupId === 2 && (
+            {/* Text */}
             <div>
-              <label className="mb-1 block text-sm font-medium">Персона</label>
-              <input
-                type="text"
-                value={formData.persona}
+              <div className="mb-1 flex items-center justify-between">
+                <label className="text-sm font-medium">Текст правила</label>
+                <button
+                  onClick={handleAiCheck}
+                  disabled={isAiChecking || !formData.text.trim()}
+                  className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs hover:bg-gray-50 disabled:opacity-50"
+                >
+                  <Sparkles className="h-3.5 w-3.5" /> {isAiChecking ? "Проверяю..." : "Проверить ИИ"}
+                </button>
+              </div>
+              <textarea
+                value={formData.text}
                 onChange={(e) =>
-                  setFormData({ ...formData, persona: e.target.value })
+                  setFormData({ ...formData, text: e.target.value })
                 }
+                rows={8}
                 className="w-full rounded-md border px-3 py-2 text-sm"
-                placeholder="ФИО"
+                placeholder="Введите текст правила..."
               />
             </div>
-          )}
 
-          {/* Decision body and date */}
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <label className="mb-1 block text-sm font-medium">
-                Орган решения
-              </label>
-              <select
-                value={formData.decisionBodyId ?? ""}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    decisionBodyId: e.target.value
-                      ? Number(e.target.value)
-                      : null,
-                  })
-                }
-                className="w-full rounded-md border px-3 py-2 text-sm"
-              >
-                <option value="">Не указано</option>
-                {decisionBodies.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.code} — {b.name}
-                  </option>
+            {/* Categories */}
+            <div>
+              <label className="mb-2 block text-sm font-medium">Категории</label>
+              <div className="flex flex-wrap gap-2">
+                {categories.map((cat) => (
+                  <label
+                    key={cat.id}
+                    className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors ${
+                      formData.categoryIds.includes(cat.id)
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-gray-200 hover:bg-gray-50"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={formData.categoryIds.includes(cat.id)}
+                      onChange={() => toggleCategory(cat.id)}
+                      className="sr-only"
+                    />
+                    {cat.name}
+                  </label>
                 ))}
-              </select>
-            </div>
-            <div className="flex-1">
-              <label className="mb-1 block text-sm font-medium">
-                Дата решения
-              </label>
-              <input
-                type="date"
-                value={formData.decisionDate}
-                onChange={(e) =>
-                  setFormData({ ...formData, decisionDate: e.target.value })
-                }
-                className="w-full rounded-md border px-3 py-2 text-sm"
-              />
+              </div>
             </div>
           </div>
 
-          {/* Text */}
-          <div>
-            <div className="mb-1 flex items-center justify-between">
-              <label className="text-sm font-medium">Текст правила</label>
+          {/* Actions */}
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-2">
+            {/* Left: archive + delete (edit mode, admin only) */}
+            <div className="flex gap-2">
+              {mode === "edit" && isAdmin && (
+                <>
+                  <button
+                    onClick={handleArchive}
+                    disabled={isSaving}
+                    className="inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                    title={rule?.status_id === 1 ? "Архивировать" : "Восстановить"}
+                  >
+                    {rule?.status_id === 1 ? <Archive className="h-4 w-4" /> : <ArchiveRestore className="h-4 w-4" />}
+                    {rule?.status_id === 1 ? "Архивировать" : "Восстановить"}
+                  </button>
+                  <button
+                    onClick={handleDelete}
+                    disabled={isSaving}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-red-200 px-3 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+                  >
+                    <Trash2 className="h-4 w-4" /> Удалить
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Right: cancel + save */}
+            <div className="flex gap-3">
               <button
-                onClick={handleAiCheck}
-                disabled={isPending || !formData.text.trim()}
-                className="rounded border px-2 py-1 text-xs hover:bg-gray-50 disabled:opacity-50"
+                onClick={() => onClose()}
+                className="rounded-md border px-4 py-2 text-sm hover:bg-gray-50"
               >
-                {isPending ? "Проверяю..." : "Проверить ИИ"}
+                Отмена
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={isSaving}
+                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                {isSaving
+                  ? "Сохраняю..."
+                  : mode === "add"
+                    ? "Добавить"
+                    : "Сохранить"}
               </button>
             </div>
-            <textarea
-              value={formData.text}
-              onChange={(e) =>
-                setFormData({ ...formData, text: e.target.value })
-              }
-              rows={6}
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              placeholder="Введите текст правила..."
-            />
-          </div>
-
-          {/* AI Response */}
-          {aiResponse && (
-            <div className="rounded-md border border-blue-200 bg-blue-50 p-3">
-              <p className="mb-1 text-xs font-medium text-blue-700">
-                Ответ ИИ:
-              </p>
-              <pre className="whitespace-pre-wrap text-sm">{aiResponse}</pre>
-            </div>
-          )}
-
-          {/* Categories */}
-          <div>
-            <label className="mb-2 block text-sm font-medium">Категории</label>
-            <div className="flex flex-wrap gap-2">
-              {categories.map((cat) => (
-                <label
-                  key={cat.id}
-                  className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors ${
-                    formData.categoryIds.includes(cat.id)
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-gray-200 hover:bg-gray-50"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={formData.categoryIds.includes(cat.id)}
-                    onChange={() => toggleCategory(cat.id)}
-                    className="sr-only"
-                  />
-                  {cat.name}
-                </label>
-              ))}
-            </div>
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="mt-6 flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="rounded-md border px-4 py-2 text-sm hover:bg-gray-50"
-          >
-            Отмена
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={isPending}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-          >
-            {isPending
-              ? "Сохраняю..."
-              : mode === "add"
-                ? "Добавить"
-                : "Сохранить"}
-          </button>
-        </div>
+        {/* Right: AI Response */}
+        {aiResponse && (
+          <div className="flex max-h-[40vh] shrink-0 flex-col border-t bg-blue-50 lg:max-h-none lg:w-[400px] lg:border-l lg:border-t-0">
+            <div className="flex items-center justify-between border-b border-blue-200 px-4 py-3">
+              <span className="text-sm font-semibold text-blue-700">Ответ ИИ</span>
+              <button
+                onClick={() => setAiResponse(null)}
+                className="rounded p-1 text-blue-400 hover:bg-blue-100 hover:text-blue-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto p-4">
+              <div
+                className="text-sm leading-relaxed text-gray-800"
+                dangerouslySetInnerHTML={{ __html: formatAiResponse(aiResponse) }}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -2,24 +2,19 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getRules } from "@/lib/queries/rules";
 import { getDecisionBodies, getAppliesTo, getPersonas } from "@/lib/queries/lookups";
-import { PersonalClient } from "./personal-client";
+import { PersonalWrapper } from "./personal-wrapper";
 
-export default async function PersonalPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ persona?: string; archived?: string }>;
-}) {
+export default async function PersonalPage() {
   const session = await auth();
   if (!session) redirect("/login");
 
-  const params = await searchParams;
-  const showArchived = params.archived === "true";
   const isAdmin = session.user.groupName === "admin";
 
+  // Fetch ALL personal decisions once, including archived
   const [rules, decisionBodies, categories, personas] = await Promise.all([
     getRules({
       groupId: 2,
-      showArchived,
+      showArchived: true,
       isAdmin,
       userCategory: session.user.category,
     }),
@@ -28,20 +23,15 @@ export default async function PersonalPage({
     getPersonas(),
   ]);
 
-  // Filter by persona client-side (or we could add it to the query)
-  const filteredRules = params.persona
-    ? rules.filter((r) => r.persona === params.persona)
-    : rules;
-
   return (
-    <PersonalClient
-      rules={filteredRules}
+    <PersonalWrapper
+      allRules={rules}
       decisionBodies={decisionBodies}
       categories={categories}
       personas={personas}
-      currentPersona={params.persona}
-      showArchived={showArchived}
       isAdmin={isAdmin}
+      userId={session.user.id}
+      userCategory={session.user.category}
     />
   );
 }

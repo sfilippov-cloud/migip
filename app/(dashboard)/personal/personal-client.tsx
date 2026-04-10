@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { formatDate } from "@/lib/utils";
-import { deleteRule, toggleArchive } from "@/lib/actions/rules";
 import { RuleDialog } from "@/components/rule-dialog";
-import { AiDrawer } from "@/components/ai-drawer";
+import { AiPanel } from "@/components/ai-panel";
+import { Pencil, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 type Rule = {
@@ -37,90 +37,88 @@ type DecisionBody = { id: number; code: string | null; name: string | null };
 type Category = { id: number; name: string | null; description: string | null };
 
 interface PersonalClientProps {
-  rules: Rule[];
+  allRules: Rule[];
   decisionBodies: DecisionBody[];
   categories: Category[];
   personas: string[];
-  currentPersona?: string;
-  showArchived: boolean;
   isAdmin: boolean;
+  userId: string;
+  userCategory?: number | null;
+  onSelectRule?: (rule: Rule | null) => void;
 }
 
 export function PersonalClient({
-  rules,
+  allRules,
   decisionBodies,
   categories,
   personas,
-  currentPersona,
-  showArchived,
   isAdmin,
+  userId,
+  userCategory,
+  onSelectRule,
 }: PersonalClientProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [editingRule, setEditingRule] = useState<Rule | null>(null);
+  const [selectedRule, setSelectedRule] = useState<Rule | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [showAiDrawer, setShowAiDrawer] = useState(false);
+  const [showAiPanel, setShowAiPanel] = useState(false);
 
-  function updateFilter(key: string, value: string | undefined) {
-    const params = new URLSearchParams(searchParams.toString());
-    if (value) {
-      params.set(key, value);
-    } else {
-      params.delete(key);
+  // Client-side filters
+  const [persona, setPersona] = useState<string>("");
+  const [showArchived, setShowArchived] = useState(false);
+
+  // Filter rules locally
+  const filteredRules = useMemo(() => {
+    return allRules.filter((rule) => {
+      if (persona && rule.persona !== persona) return false;
+      if (!showArchived && rule.status_id === 2) return false;
+      return true;
+    });
+  }, [allRules, persona, showArchived]);
+
+  function selectRule(rule: Rule) {
+    const next = selectedRule?.rule_uid === rule.rule_uid ? null : rule;
+    setSelectedRule(next);
+    onSelectRule?.(next);
+  }
+
+  function handleDialogClose(didMutate?: boolean) {
+    setEditingRule(null);
+    setShowAddDialog(false);
+    if (didMutate) {
+      setSelectedRule(null);
+      onSelectRule?.(null);
+      router.refresh();
     }
-    router.push(`/personal?${params.toString()}`);
-  }
-
-  function handleArchiveToggle(ruleUid: number, statusId: number) {
-    startTransition(async () => {
-      try {
-        await toggleArchive(ruleUid, statusId);
-        toast.success(statusId === 1 ? "Решение архивировано" : "Решение восстановлено");
-      } catch {
-        toast.error("Ошибка при изменении статуса");
-      }
-    });
-  }
-
-  function handleDelete(ruleUid: number) {
-    if (!confirm("Вы уверены, что хотите удалить это решение?")) return;
-    startTransition(async () => {
-      try {
-        await deleteRule(ruleUid);
-        toast.success("Решение удалено");
-      } catch {
-        toast.error("Ошибка при удалении");
-      }
-    });
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Персональные решения</h1>
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-xl font-bold lg:text-2xl">Персональные решения</h1>
+        <div className="flex flex-wrap items-center gap-2">
           {isAdmin && (
             <button
               onClick={() => setShowAddDialog(true)}
-              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 lg:px-4 lg:py-2"
             >
               Добавить
             </button>
           )}
           <a
-            href={`/api/pdf/personal${currentPersona ? `?persona=${encodeURIComponent(currentPersona)}` : ""}`}
+            href={`/api/pdf/personal${persona ? `?persona=${encodeURIComponent(persona)}` : ""}`}
             download
-            className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-gray-50"
+            className="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-gray-50 lg:px-4 lg:py-2"
           >
-            Скачать PDF
+            PDF
           </a>
           <button
-            onClick={() => setShowAiDrawer(true)}
-            className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-gray-50"
+            onClick={() => setShowAiPanel((v) => !v)}
+            className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium lg:px-4 lg:py-2 ${showAiPanel ? "border-primary bg-primary/5 text-primary" : "hover:bg-gray-50"}`}
           >
-            Спросить ИИ
+            <Sparkles className="h-4 w-4" /> <span className="hidden sm:inline">Спросить</span> ИИ
           </button>
         </div>
       </div>
@@ -130,10 +128,8 @@ export function PersonalClient({
         <div className="flex items-center gap-2">
           <label className="text-sm font-medium text-gray-700">Персона:</label>
           <select
-            value={currentPersona ?? ""}
-            onChange={(e) =>
-              updateFilter("persona", e.target.value || undefined)
-            }
+            value={persona}
+            onChange={(e) => setPersona(e.target.value)}
             className="rounded-md border px-3 py-1.5 text-sm"
           >
             <option value="">Все</option>
@@ -150,12 +146,7 @@ export function PersonalClient({
             <input
               type="checkbox"
               checked={showArchived}
-              onChange={(e) =>
-                updateFilter(
-                  "archived",
-                  e.target.checked ? "true" : undefined
-                )
-              }
+              onChange={(e) => setShowArchived(e.target.checked)}
               className="rounded"
             />
             Показать архивные
@@ -163,22 +154,23 @@ export function PersonalClient({
         )}
       </div>
 
-      {/* Personal Decisions Table */}
-      <div className="overflow-auto rounded-lg border">
+      {/* Table + AI Panel */}
+      <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
+      <div className="min-h-0 flex-1 overflow-auto rounded-lg border">
         <table className="w-full text-left text-sm">
-          <thead className="border-b bg-gray-50 text-xs font-medium uppercase text-gray-500">
+          <thead className="sticky top-0 border-b bg-gray-50 text-xs font-medium uppercase text-gray-500">
             <tr>
-              <th className="px-4 py-3">N</th>
-              <th className="px-4 py-3">Персона</th>
-              <th className="px-4 py-3">Текст решения</th>
-              <th className="px-4 py-3">Орган</th>
-              <th className="px-4 py-3">Дата</th>
-              <th className="px-4 py-3">Статус</th>
-              {isAdmin && <th className="px-4 py-3">Действия</th>}
+              <th className="px-3 py-3 lg:px-4">N</th>
+              <th className="px-3 py-3 lg:px-4">Персона</th>
+              <th className="px-3 py-3 lg:px-4">Текст решения</th>
+              <th className="hidden px-4 py-3 md:table-cell">Орган</th>
+              <th className="hidden px-4 py-3 md:table-cell">Дата</th>
+              <th className="hidden px-4 py-3 sm:table-cell">Статус</th>
+              {isAdmin && <th className="w-10 px-2 py-3"></th>}
             </tr>
           </thead>
           <tbody className="divide-y">
-            {rules.length === 0 ? (
+            {filteredRules.length === 0 ? (
               <tr>
                 <td
                   colSpan={isAdmin ? 7 : 6}
@@ -188,27 +180,28 @@ export function PersonalClient({
                 </td>
               </tr>
             ) : (
-              rules.map((rule) => (
+              filteredRules.map((rule) => (
                 <tr
                   key={rule.rule_uid}
-                  className={`hover:bg-gray-50 ${rule.status_id === 2 ? "opacity-50" : ""}`}
+                  onClick={() => selectRule(rule)}
+                  className={`cursor-pointer ${rule.status_id === 2 ? "opacity-50" : ""} ${selectedRule?.rule_uid === rule.rule_uid ? "bg-blue-50" : "hover:bg-gray-50"}`}
                 >
-                  <td className="whitespace-nowrap px-4 py-3 font-medium">
+                  <td className="whitespace-nowrap px-3 py-3 font-medium lg:px-4">
                     {rule.id}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3">
+                  <td className="whitespace-nowrap px-3 py-3 lg:px-4">
                     {rule.persona}
                   </td>
-                  <td className="max-w-lg px-4 py-3">
-                    <p className="line-clamp-3">{rule.text}</p>
+                  <td className="px-3 py-3 whitespace-pre-wrap lg:px-4">
+                    {rule.text}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3">
+                  <td className="hidden whitespace-nowrap px-4 py-3 md:table-cell">
                     {rule.decision_body?.code}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3">
+                  <td className="hidden whitespace-nowrap px-4 py-3 md:table-cell">
                     {formatDate(rule.decision_date)}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3">
+                  <td className="hidden whitespace-nowrap px-4 py-3 sm:table-cell">
                     <span
                       className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
                         rule.status_id === 1
@@ -220,31 +213,14 @@ export function PersonalClient({
                     </span>
                   </td>
                   {isAdmin && (
-                    <td className="whitespace-nowrap px-4 py-3">
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => setEditingRule(rule)}
-                          className="rounded px-2 py-1 text-xs hover:bg-gray-100"
-                        >
-                          Изм.
-                        </button>
-                        <button
-                          onClick={() =>
-                            handleArchiveToggle(rule.rule_uid, rule.status_id!)
-                          }
-                          className="rounded px-2 py-1 text-xs hover:bg-gray-100"
-                          disabled={isPending}
-                        >
-                          {rule.status_id === 1 ? "Арх." : "Восст."}
-                        </button>
-                        <button
-                          onClick={() => handleDelete(rule.rule_uid)}
-                          className="rounded px-2 py-1 text-xs text-red-600 hover:bg-red-50"
-                          disabled={isPending}
-                        >
-                          Уд.
-                        </button>
-                      </div>
+                    <td className="whitespace-nowrap px-2 py-3">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setEditingRule(rule); }}
+                        className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                        title="Редактировать"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
                     </td>
                   )}
                 </tr>
@@ -263,7 +239,8 @@ export function PersonalClient({
           decisionBodies={decisionBodies}
           categories={categories}
           groupId={2}
-          onClose={() => setEditingRule(null)}
+          isAdmin={isAdmin}
+          onClose={handleDialogClose}
         />
       )}
 
@@ -275,13 +252,18 @@ export function PersonalClient({
           decisionBodies={decisionBodies}
           categories={categories}
           groupId={2}
-          onClose={() => setShowAddDialog(false)}
+          isAdmin={isAdmin}
+          onClose={handleDialogClose}
         />
       )}
 
-      {showAiDrawer && (
-        <AiDrawer onClose={() => setShowAiDrawer(false)} />
+      {/* AI Panel */}
+      {showAiPanel && (
+        <div className="h-[300px] shrink-0 rounded-lg border lg:h-auto lg:w-[400px]">
+          <AiPanel userId={userId} userType={isAdmin ? "public" : String(userCategory ?? "public")} />
+        </div>
       )}
+      </div>
     </div>
   );
 }

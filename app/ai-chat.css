@@ -1,0 +1,139 @@
+/* n8n chat widget overrides */
+.ai-chat-panel {
+  --chat--color--primary: hsl(240 5.9% 10%);
+  --chat--color--primary-shade-50: hsl(240 5.9% 20%);
+  --chat--color--primary--shade-100: hsl(240 5.9% 30%);
+  --chat--color--secondary: hsl(240 5.9% 10%);
+  --chat--color-secondary-shade-50: hsl(240 5.9% 20%);
+  --chat--color-white: #ffffff;
+  --chat--color-light: #f9fafb;
+  --chat--color-light-shade-50: #f3f4f6;
+  --chat--color-light-shade-100: #e5e7eb;
+  --chat--color-medium: #d1d5db;
+  --chat--color-dark: #1f2937;
+  --chat--color-disabled: #d1d5db;
+  --chat--color-typing: #9ca3af;
+
+  --chat--spacing: 0.75rem;
+  --chat--border-radius: 0.5rem;
+
+  --chat--header-height: auto;
+  --chat--header--padding: 0.75rem 1rem;
+  --chat--header--background: #ffffff;
+  --chat--header--color: #1f2937;
+  --chat--header--border-bottom: 1px solid #e5e7eb;
+
+  --chat--heading--font-size: 0.875rem;
+  --chat--subtitle--font-size: 0.75rem;
+  --chat--subtitle--line-height: 1.4;
+
+  --chat--textarea--height: 24px;
+  --chat--textarea--max-height: 10rem;
+
+  --chat--message--font-size: 0.875rem;
+  --chat--message--padding: 0.625rem 0.875rem;
+  --chat--message--border-radius: 0.75rem;
+  --chat--message--margin-bottom: 0.5rem;
+
+  --chat--message--bot--background: #f3f4f6;
+  --chat--message--bot--color: #1f2937;
+  --chat--message--user--background: hsl(240 5.9% 10%);
+  --chat--message--user--color: #f9fafb;
+
+  --chat--message--pre--background: #1f2937;
+
+  --chat--body--background: #ffffff;
+
+  --chat--input--container--background: #f9fafb;
+  --chat--input--container--border: 1px solid #e5e7eb;
+  --chat--input--container--border-radius: 1.25rem;
+  --chat--input--container--padding: 0.5rem;
+  --chat--input--font-size: 0.875rem;
+  --chat--input--background: transparent;
+  --chat--input--padding: 0.4rem 0.75rem;
+
+  --chat--footer--padding: 0.75rem;
+  --chat--footer--background: #ffffff;
+  --chat--footer--border-top: 1px solid #e5e7eb;
+}
+
+/* Container must be flex so layout can stretch properly */
+.ai-chat-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Hide the toggle button */
+.ai-chat-panel .chat-window-toggle {
+  display: none !important;
+}
+
+/* Make window fill container without absolute positioning */
+.ai-chat-panel .chat-window-wrapper {
+  width: 100% !important;
+  height: 100% !important;
+  position: relative !important;
+}
+
+.ai-chat-panel .chat-window {
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  width: 100% !important;
+  height: 100% !important;
+  position: relative !important;
+  inset: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Layout must be flex column with body taking remaining space */
+.ai-chat-panel .chat-layout {
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+.ai-chat-panel .chat-body {
+  flex: 1 !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+}
+
+/* Input area must not be pushed out */
+.ai-chat-panel .chat-input {
+  flex-shrink: 0 !important;
+}
+
+/* Footer must not be pushed out */
+.ai-chat-panel .chat-footer {
+  flex-shrink: 0 !important;
+}
+
+/* Compact input area */
+.ai-chat-panel .chat-inputs {
+  padding: 4px 8px !important;
+  align-items: center !important;
+}
+
+.ai-chat-panel .chat-inputs textarea {
+  height: 24px !important;
+  min-height: 24px !important;
+  max-height: 10rem !important;
+  padding: 4px 8px !important;
+}
+
+.ai-chat-panel .chat-input-send-button,
+.ai-chat-panel .chat-input-file-button {
+  height: 32px !important;
+  width: 32px !important;
+  margin: 2px !important;
+  font-size: 18px !important;
+}
+
+/* Hide "Powered by n8n" */
+.ai-chat-panel .chat-powered-by {
+  display: none !important;
+}

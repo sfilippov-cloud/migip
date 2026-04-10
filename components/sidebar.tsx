@@ -6,12 +6,18 @@ import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
 
+interface CategoryInfo {
+  name: string | null;
+}
+
 interface SidebarProps {
   user: {
     name: string;
     email: string;
     groupName: string;
   };
+  selectedRuleCategories?: CategoryInfo[];
+  onNavigate?: () => void;
 }
 
 const navItems = [
@@ -23,22 +29,22 @@ const adminItems = [
   { href: "/users", label: "Пользователи", icon: "⚙️" },
 ];
 
-export function Sidebar({ user }: SidebarProps) {
+export function Sidebar({ user, selectedRuleCategories, onNavigate }: SidebarProps) {
   const pathname = usePathname();
   const isAdmin = user.groupName === "admin";
 
   return (
-    <aside className="flex w-64 flex-col border-r bg-gray-50">
-      <div className="flex items-center gap-3 border-b px-4 py-5">
-        <Image src="/migip_logo.png" alt="MIGIP" width={36} height={36} />
-        <span className="text-lg font-semibold">MIGIP</span>
+    <aside className="flex w-64 shrink-0 flex-col border-r bg-gray-50">
+      <div className="flex items-center justify-center border-b px-4 py-4">
+        <Image src="/migip_logo.png" alt="MIGIP" width={160} height={60} className="h-auto w-auto max-h-[60px]" />
       </div>
 
-      <nav className="flex-1 space-y-1 px-3 py-4">
+      <nav className="space-y-1 px-3 py-4">
         {navItems.map((item) => (
           <Link
             key={item.href}
             href={item.href}
+            onClick={onNavigate}
             className={cn(
               "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
               pathname === item.href
@@ -58,6 +64,7 @@ export function Sidebar({ user }: SidebarProps) {
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={onNavigate}
                 className={cn(
                   "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                   pathname === item.href
@@ -73,7 +80,26 @@ export function Sidebar({ user }: SidebarProps) {
         )}
       </nav>
 
-      <div className="border-t px-4 py-4">
+      {/* Доступно для: */}
+      {selectedRuleCategories && selectedRuleCategories.length > 0 && (
+        <div className="border-t px-4 py-4">
+          <p className="mb-2 text-xs font-semibold uppercase text-gray-500">
+            Доступно для:
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {selectedRuleCategories.map((cat, i) => (
+              <span
+                key={i}
+                className="inline-flex rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700"
+              >
+                {cat.name}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="mt-auto border-t px-4 py-4">
         <div className="mb-2 text-sm">
           <p className="font-medium text-gray-900">{user.name}</p>
           <p className="text-gray-500">{user.email}</p>

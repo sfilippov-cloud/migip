@@ -35,15 +35,15 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50">
       <div className="w-full max-w-sm space-y-6 rounded-lg border bg-white p-8 shadow-sm">
-        <div className="flex flex-col items-center gap-4">
+        <div className="flex justify-center">
           <Image
             src="/migip_logo.png"
             alt="MIGIP"
-            width={80}
+            width={200}
             height={80}
+            className="h-auto w-auto max-h-[80px]"
             priority
           />
-          <h1 className="text-2xl font-semibold">MIGIP</h1>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">

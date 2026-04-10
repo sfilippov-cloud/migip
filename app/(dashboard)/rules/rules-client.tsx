@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { Fragment, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { formatDate } from "@/lib/utils";
 import { deleteRule, toggleArchive } from "@/lib/actions/rules";
 import { RuleDialog } from "@/components/rule-dialog";
-import { AiDrawer } from "@/components/ai-drawer";
+import { AiPanel } from "@/components/ai-panel";
+import { Pencil, Sparkles, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 
 type Rule = {
@@ -39,80 +40,116 @@ type DecisionBody = { id: number; code: string | null; name: string | null };
 type Category = { id: number; name: string | null; description: string | null };
 
 interface RulesClientProps {
-  rules: Rule[];
+  allRules: Rule[];
   sections: Section[];
   ruleTypes: RuleType[];
   decisionBodies: DecisionBody[];
   categories: Category[];
-  currentSectionId?: number;
-  currentTypeId?: number;
-  showArchived: boolean;
   isAdmin: boolean;
   groupId: number;
+  userId: string;
+  userCategory?: number | null;
+  onSelectRule?: (rule: Rule | null) => void;
 }
 
 export function RulesClient({
-  rules,
+  allRules,
   sections,
   ruleTypes,
   decisionBodies,
   categories,
-  currentSectionId,
-  currentTypeId,
-  showArchived,
   isAdmin,
   groupId,
+  userId,
+  userCategory,
+  onSelectRule,
 }: RulesClientProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [editingRule, setEditingRule] = useState<Rule | null>(null);
+  const [selectedRule, setSelectedRule] = useState<Rule | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [showAiDrawer, setShowAiDrawer] = useState(false);
+  const [showAiPanel, setShowAiPanel] = useState(false);
 
-  function updateFilter(key: string, value: string | undefined) {
-    const params = new URLSearchParams(searchParams.toString());
-    if (value) {
-      params.set(key, value);
-    } else {
-      params.delete(key);
+  function selectRule(rule: Rule) {
+    const next = selectedRule?.rule_uid === rule.rule_uid ? null : rule;
+    setSelectedRule(next);
+    onSelectRule?.(next);
+  }
+
+  // Client-side filters
+  const [sectionId, setSectionId] = useState<number | "">("");
+  const [typeId, setTypeId] = useState<number | "">("");
+  const [showArchived, setShowArchived] = useState(false);
+
+  const colSpan = isAdmin ? 6 : 5; // Пункт, Текст, Орган, Дата, Статус + Edit
+
+  // Filter rules locally
+  const filteredRules = useMemo(() => {
+    return allRules.filter((rule) => {
+      if (sectionId && rule.section_id !== sectionId) return false;
+      if (typeId && rule.rule_type_id !== typeId) return false;
+      if (!showArchived && rule.status_id === 2) return false;
+      return true;
+    });
+  }, [allRules, sectionId, typeId, showArchived]);
+
+  // Build ordered list of section/type pairs for navigation
+  const navSteps = useMemo(() => {
+    if (!sectionId && !typeId) return []; // both "Все" — no navigation
+    if (sectionId && !typeId) {
+      // Only section selected — navigate between sections
+      return sections.map((s) => ({ sectionId: s.id, typeId: "" as const }));
     }
-    router.push(`/rules?${params.toString()}`);
+    // Both selected — navigate section+type combos in order
+    const pairs: { sectionId: number; typeId: number }[] = [];
+    for (const s of sections) {
+      for (const t of ruleTypes) {
+        pairs.push({ sectionId: s.id, typeId: t.id });
+      }
+    }
+    return pairs;
+  }, [sections, ruleTypes, sectionId, typeId]);
+
+  const currentStepIndex = useMemo(() => {
+    if (navSteps.length === 0) return -1;
+    return navSteps.findIndex(
+      (step) =>
+        step.sectionId === sectionId &&
+        (step.typeId === "" ? !typeId : step.typeId === typeId)
+    );
+  }, [navSteps, sectionId, typeId]);
+
+  const canNavigate = navSteps.length > 0 && currentStepIndex !== -1;
+  const canPrev = canNavigate && currentStepIndex > 0;
+  const canNext = canNavigate && currentStepIndex < navSteps.length - 1;
+
+  function goToStep(index: number) {
+    const step = navSteps[index];
+    setSectionId(step.sectionId);
+    setTypeId(step.typeId || "");
   }
 
-  function handleArchiveToggle(ruleUid: number, statusId: number) {
-    startTransition(async () => {
-      try {
-        await toggleArchive(ruleUid, statusId);
-        toast.success(statusId === 1 ? "Правило архивировано" : "Правило восстановлено");
-      } catch {
-        toast.error("Ошибка при изменении статуса");
-      }
-    });
-  }
-
-  function handleDelete(ruleUid: number) {
-    if (!confirm("Вы уверены, что хотите удалить это правило?")) return;
-    startTransition(async () => {
-      try {
-        await deleteRule(ruleUid);
-        toast.success("Правило удалено");
-      } catch {
-        toast.error("Ошибка при удалении");
-      }
-    });
+  function handleDialogClose(didMutate?: boolean) {
+    setEditingRule(null);
+    setShowAddDialog(false);
+    if (didMutate) {
+      setSelectedRule(null);
+      onSelectRule?.(null);
+      router.refresh();
+    }
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Правила МИГИПа</h1>
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-xl font-bold lg:text-2xl">Правила МИГИПа</h1>
+        <div className="flex flex-wrap items-center gap-2">
           {isAdmin && (
             <button
               onClick={() => setShowAddDialog(true)}
-              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 lg:px-4 lg:py-2"
             >
               Добавить
             </button>
@@ -120,15 +157,15 @@ export function RulesClient({
           <a
             href="/api/pdf/rules"
             download
-            className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-gray-50"
+            className="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-gray-50 lg:px-4 lg:py-2"
           >
-            Скачать PDF
+            PDF
           </a>
           <button
-            onClick={() => setShowAiDrawer(true)}
-            className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-gray-50"
+            onClick={() => setShowAiPanel((v) => !v)}
+            className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium lg:px-4 lg:py-2 ${showAiPanel ? "border-primary bg-primary/5 text-primary" : "hover:bg-gray-50"}`}
           >
-            Спросить ИИ
+            <Sparkles className="h-4 w-4" /> <span className="hidden sm:inline">Спросить</span> ИИ
           </button>
         </div>
       </div>
@@ -138,10 +175,8 @@ export function RulesClient({
         <div className="flex items-center gap-2">
           <label className="text-sm font-medium text-gray-700">Раздел:</label>
           <select
-            value={currentSectionId ?? ""}
-            onChange={(e) =>
-              updateFilter("section", e.target.value || undefined)
-            }
+            value={sectionId}
+            onChange={(e) => setSectionId(e.target.value ? Number(e.target.value) : "")}
             className="rounded-md border px-3 py-1.5 text-sm"
           >
             <option value="">Все</option>
@@ -156,10 +191,8 @@ export function RulesClient({
         <div className="flex items-center gap-2">
           <label className="text-sm font-medium text-gray-700">Тип:</label>
           <select
-            value={currentTypeId ?? ""}
-            onChange={(e) =>
-              updateFilter("type", e.target.value || undefined)
-            }
+            value={typeId}
+            onChange={(e) => setTypeId(e.target.value ? Number(e.target.value) : "")}
             className="rounded-md border px-3 py-1.5 text-sm"
           >
             <option value="">Все</option>
@@ -176,12 +209,7 @@ export function RulesClient({
             <input
               type="checkbox"
               checked={showArchived}
-              onChange={(e) =>
-                updateFilter(
-                  "archived",
-                  e.target.checked ? "true" : undefined
-                )
-              }
+              onChange={(e) => setShowArchived(e.target.checked)}
               className="rounded"
             />
             Показать архивные
@@ -189,92 +217,114 @@ export function RulesClient({
         )}
       </div>
 
-      {/* Rules Table */}
-      <div className="overflow-auto rounded-lg border">
+      {/* Table + AI Panel */}
+      <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
+      <div className="min-h-0 flex-1 overflow-auto rounded-lg border">
         <table className="w-full text-left text-sm">
-          <thead className="border-b bg-gray-50 text-xs font-medium uppercase text-gray-500">
+          <thead className="sticky top-0 border-b bg-gray-50 text-xs font-medium uppercase text-gray-500">
             <tr>
-              <th className="px-4 py-3">Пункт</th>
-              <th className="px-4 py-3">Текст правила</th>
-              <th className="px-4 py-3">Орган</th>
-              <th className="px-4 py-3">Дата</th>
-              <th className="px-4 py-3">Статус</th>
-              {isAdmin && <th className="px-4 py-3">Действия</th>}
+              <th className="px-3 py-3 lg:px-4">Пункт</th>
+              <th className="px-3 py-3 lg:px-4">Текст правила</th>
+              <th className="hidden px-4 py-3 md:table-cell">Орган</th>
+              <th className="hidden px-4 py-3 md:table-cell">Дата</th>
+              <th className="hidden px-4 py-3 sm:table-cell">Статус</th>
+              {isAdmin && <th className="w-10 px-2 py-3"></th>}
             </tr>
           </thead>
           <tbody className="divide-y">
-            {rules.length === 0 ? (
+            {filteredRules.length === 0 ? (
               <tr>
-                <td colSpan={isAdmin ? 6 : 5} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={colSpan} className="px-4 py-8 text-center text-gray-500">
                   Нет правил для отображения
                 </td>
               </tr>
             ) : (
-              rules.map((rule) => (
-                <tr
-                  key={rule.rule_uid}
-                  className={`hover:bg-gray-50 ${rule.status_id === 2 ? "opacity-50" : ""}`}
-                >
-                  <td className="whitespace-nowrap px-4 py-3 font-medium">
-                    {rule.id}
-                    {rule.sub_id ? `.${rule.sub_id}` : ""}
-                  </td>
-                  <td className="max-w-lg px-4 py-3">
-                    <p className="line-clamp-3">{rule.text}</p>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3">
-                    {rule.decision_body?.code}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3">
-                    {formatDate(rule.decision_date)}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                        rule.status_id === 1
-                          ? "bg-green-100 text-green-700"
-                          : "bg-gray-100 text-gray-600"
-                      }`}
+              filteredRules.map((rule, idx) => {
+                const prev = idx > 0 ? filteredRules[idx - 1] : null;
+                const showSection = rule.section_id !== prev?.section_id;
+                const showType = showSection || rule.rule_type_id !== prev?.rule_type_id;
+
+                return (
+                  <Fragment key={rule.rule_uid}>
+                    {showSection && (
+                      <tr>
+                        <td colSpan={colSpan} className="bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-800">
+                          {rule.section_id}. {rule.section?.name}
+                        </td>
+                      </tr>
+                    )}
+                    {showType && (
+                      <tr>
+                        <td colSpan={colSpan} className="bg-gray-50 px-4 py-1.5 pl-8 text-sm font-medium text-gray-600">
+                          {rule.rule_type_id}. {rule.rule_type?.name}
+                        </td>
+                      </tr>
+                    )}
+                    <tr
+                      onClick={() => selectRule(rule)}
+                      className={`cursor-pointer ${rule.status_id === 2 ? "opacity-50" : ""} ${selectedRule?.rule_uid === rule.rule_uid ? "bg-blue-50" : "hover:bg-gray-50"}`}
                     >
-                      {rule.status?.name ?? (rule.status_id === 1 ? "Активный" : "Архив")}
-                    </span>
-                  </td>
-                  {isAdmin && (
-                    <td className="whitespace-nowrap px-4 py-3">
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => setEditingRule(rule)}
-                          className="rounded px-2 py-1 text-xs hover:bg-gray-100"
-                          title="Редактировать"
+                      <td className="whitespace-nowrap px-3 py-3 font-medium lg:px-4">
+                        {rule.section_id}.{rule.rule_type_id}.{rule.id}{rule.sub_id ? `.${rule.sub_id}` : ""}
+                      </td>
+                      <td className={`px-3 py-3 whitespace-pre-wrap lg:px-4 ${rule.sub_id ? "pl-6 lg:pl-8" : ""}`}>
+                        {rule.text}
+                      </td>
+                      <td className="hidden whitespace-nowrap px-4 py-3 md:table-cell">
+                        {rule.decision_body?.code}
+                      </td>
+                      <td className="hidden whitespace-nowrap px-4 py-3 md:table-cell">
+                        {formatDate(rule.decision_date)}
+                      </td>
+                      <td className="hidden whitespace-nowrap px-4 py-3 sm:table-cell">
+                        <span
+                          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                            rule.status_id === 1
+                              ? "bg-green-100 text-green-700"
+                              : "bg-gray-100 text-gray-600"
+                          }`}
                         >
-                          Изм.
-                        </button>
-                        <button
-                          onClick={() =>
-                            handleArchiveToggle(rule.rule_uid, rule.status_id!)
-                          }
-                          className="rounded px-2 py-1 text-xs hover:bg-gray-100"
-                          disabled={isPending}
-                          title={rule.status_id === 1 ? "Архивировать" : "Восстановить"}
-                        >
-                          {rule.status_id === 1 ? "Арх." : "Восст."}
-                        </button>
-                        <button
-                          onClick={() => handleDelete(rule.rule_uid)}
-                          className="rounded px-2 py-1 text-xs text-red-600 hover:bg-red-50"
-                          disabled={isPending}
-                          title="Удалить"
-                        >
-                          Уд.
-                        </button>
-                      </div>
-                    </td>
-                  )}
-                </tr>
-              ))
+                          {rule.status?.name ?? (rule.status_id === 1 ? "Активный" : "Архив")}
+                        </span>
+                      </td>
+                      {isAdmin && (
+                        <td className="whitespace-nowrap px-2 py-3">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setEditingRule(rule); }}
+                            className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                            title="Редактировать"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  </Fragment>
+                );
+              })
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Navigation */}
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => goToStep(currentStepIndex - 1)}
+          disabled={!canPrev}
+          className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-gray-50 disabled:pointer-events-none disabled:opacity-30"
+        >
+          <ChevronLeft className="h-4 w-4" /> Предыдущий раздел
+        </button>
+        <button
+          onClick={() => goToStep(currentStepIndex + 1)}
+          disabled={!canNext}
+          className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-gray-50 disabled:pointer-events-none disabled:opacity-30"
+        >
+          Следующий раздел <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
       </div>
 
       {/* Edit Rule Dialog */}
@@ -287,7 +337,8 @@ export function RulesClient({
           decisionBodies={decisionBodies}
           categories={categories}
           groupId={groupId}
-          onClose={() => setEditingRule(null)}
+          isAdmin={isAdmin}
+          onClose={handleDialogClose}
         />
       )}
 
@@ -300,16 +351,20 @@ export function RulesClient({
           decisionBodies={decisionBodies}
           categories={categories}
           groupId={groupId}
-          defaultSectionId={currentSectionId}
-          defaultTypeId={currentTypeId}
-          onClose={() => setShowAddDialog(false)}
+          isAdmin={isAdmin}
+          defaultSectionId={sectionId || undefined}
+          defaultTypeId={typeId || undefined}
+          onClose={handleDialogClose}
         />
       )}
 
-      {/* AI Chat Drawer */}
-      {showAiDrawer && (
-        <AiDrawer onClose={() => setShowAiDrawer(false)} />
+      {/* AI Panel */}
+      {showAiPanel && (
+        <div className="h-[300px] shrink-0 rounded-lg border lg:h-auto lg:w-[400px]">
+          <AiPanel userId={userId} userType={isAdmin ? "public" : String(userCategory ?? "public")} />
+        </div>
       )}
+      </div>
     </div>
   );
 }

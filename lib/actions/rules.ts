@@ -237,14 +237,12 @@ async function triggerAiEmbed(ruleUid: number) {
   if (!url) return;
 
   try {
-    await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rule_uid: ruleUid }),
-    });
-  } catch {
-    // AI embedding is non-critical; log but don't fail
-    console.error(`Failed to trigger AI embed for rule_uid ${ruleUid}`);
+    const requestUrl = `${url}?rule_uid=${ruleUid}`;
+    console.log(`AI embed → GET ${requestUrl}`);
+    const response = await fetch(requestUrl);
+    console.log(`AI embed ← ${response.status} ${response.statusText}`);
+  } catch (err) {
+    console.error(`Failed to trigger AI embed for rule_uid ${ruleUid}:`, err);
   }
 }
 
@@ -264,12 +262,15 @@ export async function improveTextWithAi(text: string) {
     });
 
     if (!response.ok) {
-      return { error: "AI service error" };
+      const body = await response.text();
+      console.error(`AI improve error: ${response.status} ${response.statusText}`, body);
+      return { error: `AI service error: ${response.status}` };
     }
 
     const data = await response.json();
     return { result: data };
-  } catch {
+  } catch (err) {
+    console.error("AI improve fetch failed:", err);
     return { error: "Failed to reach AI service" };
   }
 }
