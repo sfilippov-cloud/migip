@@ -1,0 +1,117 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Lookup: rule sections (e.g. 1-5)
+model sections {
+  id    Int     @id
+  name  String?
+  rules rules[]
+}
+
+/// Lookup: rule types/subsections (e.g. 1-4)
+model rule_types {
+  id    Int     @id
+  name  String?
+  rules rules[]
+}
+
+/// Lookup: decision-making bodies
+model decision_bodies {
+  id   Int     @id @default(autoincrement())
+  code String?
+  name String?
+  rules rules[]
+}
+
+/// Lookup: categories a rule can apply to
+model applies_to {
+  id          Int     @id @default(autoincrement())
+  name        String?
+  description String?
+  rule_applies_to rule_applies_to[]
+  users       users[]
+}
+
+/// Lookup: rule statuses (1=active, 2=archived)
+model rule_statuses {
+  id   Int     @id
+  name String?
+  rules rules[]
+}
+
+/// Lookup: document groups (1=organizational rules, 2=personal decisions)
+model doc_group {
+  id   Int     @id
+  name String?
+  rules rules[]
+}
+
+/// Core table: rules and decisions
+model rules {
+  rule_uid         Int       @id @default(autoincrement())
+  id               Int?
+  sub_id           Int?
+  section_id       Int?
+  rule_type_id     Int?
+  status_id        Int?
+  decision_body_id Int?
+  decision_date    DateTime? @db.Date
+  decision_note    String?
+  summary          String?
+  text             String?
+  persona          String?
+  group_id         Int?
+
+  section        sections?         @relation(fields: [section_id], references: [id])
+  rule_type      rule_types?       @relation(fields: [rule_type_id], references: [id])
+  status         rule_statuses?    @relation(fields: [status_id], references: [id])
+  decision_body  decision_bodies?  @relation(fields: [decision_body_id], references: [id])
+  doc_group      doc_group?        @relation(fields: [group_id], references: [id])
+  rule_applies_to rule_applies_to[]
+  rule_embeddings rule_embeddings[]
+}
+
+/// Junction: rule <-> category assignment
+model rule_applies_to {
+  rule_uid      Int
+  applies_to_id Int
+
+  rule       rules      @relation(fields: [rule_uid], references: [rule_uid], onDelete: Cascade)
+  applies_to applies_to @relation(fields: [applies_to_id], references: [id])
+
+  @@id([rule_uid, applies_to_id])
+}
+
+/// AI vector embeddings per rule
+model rule_embeddings {
+  id       Int @id @default(autoincrement())
+  rule_uid Int
+
+  rule rules @relation(fields: [rule_uid], references: [rule_uid], onDelete: Cascade)
+}
+
+/// User roles: admin (id=1), viewer (id=2)
+model user_group {
+  id         Int     @id
+  name       String?
+  users      users[]
+}
+
+/// Application users
+model users {
+  id            Int     @id @default(autoincrement())
+  name          String?
+  email         String?
+  password      String?
+  category      Int?
+  user_group_id Int?
+
+  user_group    user_group? @relation(fields: [user_group_id], references: [id])
+  category_ref  applies_to? @relation(fields: [category], references: [id])
+}
