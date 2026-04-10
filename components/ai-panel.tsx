@@ -34,8 +34,8 @@ export function AiPanel({ userId, userType = "public" }: AiPanelProps) {
         },
         i18n: {
           en: {
-            title: "ИИ Ассистент",
-            subtitle: "Задайте вопрос о правилах МИГИПа",
+            title: "",
+            subtitle: "",
             footer: "",
             getStarted: "Начать",
             inputPlaceholder: "Введите вопрос...",

@@ -64,8 +64,12 @@
   overflow: hidden;
 }
 
-/* Hide the toggle button */
+/* Hide the toggle button and empty header */
 .ai-chat-panel .chat-window-toggle {
+  display: none !important;
+}
+
+.ai-chat-panel .chat-header {
   display: none !important;
 }
 
@@ -115,14 +119,14 @@
 /* Compact input area */
 .ai-chat-panel .chat-inputs {
   padding: 4px 8px !important;
-  align-items: center !important;
+  align-items: flex-end !important;
 }
 
 .ai-chat-panel .chat-inputs textarea {
-  height: 24px !important;
   min-height: 24px !important;
   max-height: 10rem !important;
   padding: 4px 8px !important;
+  field-sizing: content;
 }
 
 .ai-chat-panel .chat-input-send-button,

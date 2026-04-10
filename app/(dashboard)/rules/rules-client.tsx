@@ -6,7 +6,7 @@ import { formatDate } from "@/lib/utils";
 import { deleteRule, toggleArchive } from "@/lib/actions/rules";
 import { RuleDialog } from "@/components/rule-dialog";
 import { AiPanel } from "@/components/ai-panel";
-import { Pencil, Sparkles, ChevronLeft, ChevronRight } from "lucide-react";
+import { Pencil, Sparkles, ChevronLeft, ChevronRight, X, Plus, Download } from "lucide-react";
 import { toast } from "sonner";
 
 type Rule = {
@@ -82,8 +82,6 @@ export function RulesClient({
   const [typeId, setTypeId] = useState<number | "">("");
   const [showArchived, setShowArchived] = useState(false);
 
-  const colSpan = isAdmin ? 6 : 5; // Пункт, Текст, Орган, Дата, Статус + Edit
-
   // Filter rules locally
   const filteredRules = useMemo(() => {
     return allRules.filter((rule) => {
@@ -143,41 +141,44 @@ export function RulesClient({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-bold lg:text-2xl">Правила МИГИПа</h1>
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="text-lg font-bold md:text-2xl">Правила МИГИПа</h1>
+        <div className="flex items-center gap-2">
           {isAdmin && (
             <button
               onClick={() => setShowAddDialog(true)}
-              className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 lg:px-4 lg:py-2"
+              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              title="Добавить"
             >
-              Добавить
+              <Plus className="h-4 w-4" /> <span className="hidden md:inline">Добавить</span>
             </button>
           )}
           <a
             href="/api/pdf/rules"
             download
-            className="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-gray-50 lg:px-4 lg:py-2"
+            className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-gray-50"
+            title="Скачать PDF"
           >
-            PDF
+            <Download className="h-4 w-4" /> <span className="hidden md:inline">PDF</span>
           </a>
           <button
             onClick={() => setShowAiPanel((v) => !v)}
-            className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium lg:px-4 lg:py-2 ${showAiPanel ? "border-primary bg-primary/5 text-primary" : "hover:bg-gray-50"}`}
+            className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium ${showAiPanel ? "border-primary bg-primary/5 text-primary" : "hover:bg-gray-50"}`}
+            title="Спросить ИИ"
           >
-            <Sparkles className="h-4 w-4" /> <span className="hidden sm:inline">Спросить</span> ИИ
+            <Sparkles className="h-4 w-4" /> <span className="hidden md:inline">Спросить ИИ</span>
           </button>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700">Раздел:</label>
+      <div className="flex flex-wrap items-end gap-2 md:flex-nowrap md:items-center md:gap-4">
+        <div className="flex-1 md:flex md:flex-none md:items-center md:gap-2">
+          <label className="mb-1 block text-xs font-medium text-muted-foreground md:mb-0 md:text-sm">Раздел:</label>
           <select
             value={sectionId}
             onChange={(e) => setSectionId(e.target.value ? Number(e.target.value) : "")}
-            className="rounded-md border px-3 py-1.5 text-sm"
+            className="w-full rounded-md border bg-white px-3 py-1.5 text-sm md:w-auto"
           >
             <option value="">Все</option>
             {sections.map((s) => (
@@ -188,12 +189,12 @@ export function RulesClient({
           </select>
         </div>
 
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700">Тип:</label>
+        <div className="flex-1 md:flex md:flex-none md:items-center md:gap-2">
+          <label className="mb-1 block text-xs font-medium text-muted-foreground md:mb-0 md:text-sm">Подраздел:</label>
           <select
             value={typeId}
             onChange={(e) => setTypeId(e.target.value ? Number(e.target.value) : "")}
-            className="rounded-md border px-3 py-1.5 text-sm"
+            className="w-full rounded-md border bg-white px-3 py-1.5 text-sm md:w-auto"
           >
             <option value="">Все</option>
             {ruleTypes.map((t) => (
@@ -220,92 +221,67 @@ export function RulesClient({
       {/* Table + AI Panel */}
       <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
-      <div className="min-h-0 flex-1 overflow-auto rounded-lg border">
-        <table className="w-full text-left text-sm">
-          <thead className="sticky top-0 border-b bg-gray-50 text-xs font-medium uppercase text-gray-500">
-            <tr>
-              <th className="px-3 py-3 lg:px-4">Пункт</th>
-              <th className="px-3 py-3 lg:px-4">Текст правила</th>
-              <th className="hidden px-4 py-3 md:table-cell">Орган</th>
-              <th className="hidden px-4 py-3 md:table-cell">Дата</th>
-              <th className="hidden px-4 py-3 sm:table-cell">Статус</th>
-              {isAdmin && <th className="w-10 px-2 py-3"></th>}
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {filteredRules.length === 0 ? (
-              <tr>
-                <td colSpan={colSpan} className="px-4 py-8 text-center text-gray-500">
-                  Нет правил для отображения
-                </td>
-              </tr>
-            ) : (
-              filteredRules.map((rule, idx) => {
-                const prev = idx > 0 ? filteredRules[idx - 1] : null;
-                const showSection = rule.section_id !== prev?.section_id;
-                const showType = showSection || rule.rule_type_id !== prev?.rule_type_id;
-
-                return (
-                  <Fragment key={rule.rule_uid}>
-                    {showSection && (
-                      <tr>
-                        <td colSpan={colSpan} className="bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-800">
-                          {rule.section_id}. {rule.section?.name}
-                        </td>
-                      </tr>
-                    )}
-                    {showType && (
-                      <tr>
-                        <td colSpan={colSpan} className="bg-gray-50 px-4 py-1.5 pl-8 text-sm font-medium text-gray-600">
-                          {rule.rule_type_id}. {rule.rule_type?.name}
-                        </td>
-                      </tr>
-                    )}
-                    <tr
-                      onClick={() => selectRule(rule)}
-                      className={`cursor-pointer ${rule.status_id === 2 ? "opacity-50" : ""} ${selectedRule?.rule_uid === rule.rule_uid ? "bg-blue-50" : "hover:bg-gray-50"}`}
-                    >
-                      <td className="whitespace-nowrap px-3 py-3 font-medium lg:px-4">
+      {/* Rules list */}
+      <div className="min-h-0 flex-1 overflow-auto rounded-lg border bg-white shadow-sm">
+        {filteredRules.length === 0 ? (
+          <div className="px-4 py-8 text-center text-muted-foreground">Нет правил для отображения</div>
+        ) : (
+          <div className="divide-y">
+            {filteredRules.map((rule, idx) => {
+              const prev = idx > 0 ? filteredRules[idx - 1] : null;
+              const showSection = rule.section_id !== prev?.section_id;
+              const showType = showSection || rule.rule_type_id !== prev?.rule_type_id;
+              return (
+                <Fragment key={rule.rule_uid}>
+                  {showSection && (
+                    <div className="border-l-4 border-l-primary bg-primary/5 px-4 py-2 text-sm font-semibold text-foreground">
+                      {rule.section_id}. {rule.section?.name}
+                    </div>
+                  )}
+                  {showType && (
+                    <div className="bg-muted/50 px-4 py-1.5 pl-8 text-sm font-medium text-muted-foreground">
+                      {rule.rule_type_id}. {rule.rule_type?.name}
+                    </div>
+                  )}
+                  <div
+                    onClick={() => selectRule(rule)}
+                    className={`cursor-pointer px-4 py-3 transition-colors ${rule.status_id === 2 ? "opacity-50" : ""} ${selectedRule?.rule_uid === rule.rule_uid ? "border-l-4 border-l-primary bg-primary/5" : "hover:bg-muted/50"}`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-xs font-semibold text-gray-500">
                         {rule.section_id}.{rule.rule_type_id}.{rule.id}{rule.sub_id ? `.${rule.sub_id}` : ""}
-                      </td>
-                      <td className={`px-3 py-3 whitespace-pre-wrap lg:px-4 ${rule.sub_id ? "pl-6 lg:pl-8" : ""}`}>
-                        {rule.text}
-                      </td>
-                      <td className="hidden whitespace-nowrap px-4 py-3 md:table-cell">
-                        {rule.decision_body?.code}
-                      </td>
-                      <td className="hidden whitespace-nowrap px-4 py-3 md:table-cell">
-                        {formatDate(rule.decision_date)}
-                      </td>
-                      <td className="hidden whitespace-nowrap px-4 py-3 sm:table-cell">
-                        <span
-                          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                            rule.status_id === 1
-                              ? "bg-green-100 text-green-700"
-                              : "bg-gray-100 text-gray-600"
-                          }`}
-                        >
-                          {rule.status?.name ?? (rule.status_id === 1 ? "Активный" : "Архив")}
-                        </span>
-                      </td>
-                      {isAdmin && (
-                        <td className="whitespace-nowrap px-2 py-3">
+                      </span>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {(rule.decision_body?.code || rule.decision_date) && (
+                          <span className="hidden text-xs text-gray-400 sm:inline">
+                            {[rule.decision_body?.code, formatDate(rule.decision_date)].filter(Boolean).join(" от ")}
+                          </span>
+                        )}
+                        {rule.status_id === 2 && (
+                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">Архив</span>
+                        )}
+                        {isAdmin && (
                           <button
                             onClick={(e) => { e.stopPropagation(); setEditingRule(rule); }}
-                            className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-                            title="Редактировать"
+                            className="rounded p-1 text-gray-400 hover:text-gray-700"
                           >
-                            <Pencil className="h-4 w-4" />
+                            <Pencil className="h-3.5 w-3.5" />
                           </button>
-                        </td>
-                      )}
-                    </tr>
-                  </Fragment>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+                        )}
+                      </div>
+                    </div>
+                    <p className={`mt-1 text-sm whitespace-pre-wrap ${rule.sub_id ? "pl-4" : ""}`}>{rule.text}</p>
+                    {(rule.decision_body?.code || rule.decision_date) && (
+                      <p className="mt-1 text-xs text-gray-400 sm:hidden">
+                        {[rule.decision_body?.code, formatDate(rule.decision_date)].filter(Boolean).join(" от ")}
+                      </p>
+                    )}
+                  </div>
+                </Fragment>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Navigation */}
@@ -358,11 +334,24 @@ export function RulesClient({
         />
       )}
 
-      {/* AI Panel */}
+      {/* AI Panel — fullscreen on mobile, side panel on desktop */}
       {showAiPanel && (
-        <div className="h-[300px] shrink-0 rounded-lg border lg:h-auto lg:w-[400px]">
-          <AiPanel userId={userId} userType={isAdmin ? "public" : String(userCategory ?? "public")} />
-        </div>
+        <>
+          <div className="fixed inset-0 z-50 flex flex-col bg-white lg:hidden">
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <span className="text-sm font-semibold">ИИ Ассистент</span>
+              <button onClick={() => setShowAiPanel(false)} className="rounded p-1.5 hover:bg-gray-100">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="flex-1">
+              <AiPanel userId={userId} userType={isAdmin ? "public" : String(userCategory ?? "public")} />
+            </div>
+          </div>
+          <div className="hidden shrink-0 overflow-hidden rounded-lg border lg:block lg:w-[400px]">
+            <AiPanel userId={userId} userType={isAdmin ? "public" : String(userCategory ?? "public")} />
+          </div>
+        </>
       )}
       </div>
     </div>

@@ -236,7 +236,7 @@ export function RuleDialog({
                   </select>
                 </div>
                 <div className="flex-1">
-                  <label className="mb-1 block text-sm font-medium">Тип</label>
+                  <label className="mb-1 block text-sm font-medium">Подраздел</label>
                   <select
                     value={formData.ruleTypeId}
                     onChange={(e) =>

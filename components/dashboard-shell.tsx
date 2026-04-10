@@ -2,7 +2,8 @@
 
 import { createContext, useContext, useState, useCallback } from "react";
 import { Sidebar } from "@/components/sidebar";
-import { Menu, X } from "lucide-react";
+import { Menu } from "lucide-react";
+import Image from "next/image";
 
 interface CategoryInfo {
   name: string | null;
@@ -63,8 +64,15 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
 
         {/* Main content */}
         <div className="flex flex-1 flex-col overflow-hidden">
-          {/* Mobile header */}
-          <div className="flex items-center border-b px-4 py-3 lg:hidden">
+          {/* Mobile header — logo + hamburger */}
+          <div className="flex items-center justify-between border-b px-4 py-2 lg:hidden">
+            <Image
+              src="/migip_logo.png"
+              alt="MIGIP"
+              width={120}
+              height={40}
+              className="h-auto w-auto max-h-[36px]"
+            />
             <button
               onClick={() => setSidebarOpen(true)}
               className="rounded p-1.5 hover:bg-gray-100"
