@@ -1,4 +1,6 @@
-import { PDFParse } from "pdf-parse";
+// pdf-parse v1 has no types — use require
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pdfParse = require("pdf-parse");
 import mammoth from "mammoth";
 
 export async function extractText(
@@ -6,13 +8,8 @@ export async function extractText(
   mimeType: string
 ): Promise<string | null> {
   if (mimeType === "application/pdf") {
-    const parser = new PDFParse({ data: new Uint8Array(buffer) });
-    try {
-      const result = await parser.getText();
-      return result.text;
-    } finally {
-      await parser.destroy();
-    }
+    const data = await pdfParse(buffer);
+    return data.text;
   }
 
   if (
