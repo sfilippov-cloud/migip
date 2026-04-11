@@ -58,15 +58,29 @@ export function DocPreviewPanel({
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-auto" style={{ WebkitOverflowScrolling: "touch" }}>
-          {canPreview ? (
-            mimeType.startsWith("image/") ? (
-              <div className="flex items-center justify-center p-4">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={previewUrl} alt={title} className="max-w-full" />
-              </div>
-            ) : (
-              <iframe src={previewUrl} className="w-full" style={{ height: "200vh" }} title={title} />
-            )
+          {mimeType.startsWith("image/") ? (
+            <div className="flex items-center justify-center p-4">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={previewUrl} alt={title} className="max-w-full" />
+            </div>
+          ) : canPreview ? (
+            <div className="flex flex-col items-center justify-center gap-4 py-16">
+              <p className="text-sm text-gray-500">Нажмите, чтобы открыть документ</p>
+              <a
+                href={previewUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              >
+                Открыть
+              </a>
+              <a
+                href={downloadUrl}
+                className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600"
+              >
+                <Download className="h-4 w-4" /> Скачать файл
+              </a>
+            </div>
           ) : (
             <div className="flex flex-col items-center justify-center gap-3 py-16 text-gray-400">
               <p className="text-sm">Предпросмотр недоступен для этого типа файла</p>
