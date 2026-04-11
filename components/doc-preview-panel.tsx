@@ -38,8 +38,8 @@ export function DocPreviewPanel({
   return (
     <>
       {/* Mobile: fullscreen overlay */}
-      <div className="fixed inset-0 z-50 flex flex-col bg-white lg:hidden">
-        <div className="flex items-center justify-between border-b px-4 py-3">
+      <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-white lg:hidden">
+        <div className="flex shrink-0 items-center justify-between border-b px-4 py-3">
           <div className="min-w-0 flex-1">
             <span className="block truncate text-sm font-semibold">{title}</span>
             <span className="block truncate text-xs text-gray-400">{fileName}</span>
@@ -57,7 +57,7 @@ export function DocPreviewPanel({
             </button>
           </div>
         </div>
-        <div className="flex-1 overflow-auto">
+        <div className="min-h-0 flex-1 overflow-auto" style={{ WebkitOverflowScrolling: "touch" }}>
           {canPreview ? (
             mimeType.startsWith("image/") ? (
               <div className="flex items-center justify-center p-4">
@@ -65,7 +65,7 @@ export function DocPreviewPanel({
                 <img src={previewUrl} alt={title} className="max-w-full" />
               </div>
             ) : (
-              <iframe src={previewUrl} className="h-full w-full" title={title} />
+              <iframe src={previewUrl} className="w-full" style={{ height: "200vh" }} title={title} />
             )
           ) : (
             <div className="flex flex-col items-center justify-center gap-3 py-16 text-gray-400">
