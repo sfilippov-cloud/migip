@@ -4,8 +4,9 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-function buildUrl(): string {
-  const base = process.env.DATABASE_URL!;
+function buildUrl(): string | undefined {
+  const base = process.env.DATABASE_URL;
+  if (!base) return undefined;
   const sep = base.includes("?") ? "&" : "?";
   return `${base}${sep}connection_limit=3&pool_timeout=10`;
 }
