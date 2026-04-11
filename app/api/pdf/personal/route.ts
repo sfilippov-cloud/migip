@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getAllPersonalForPdf } from "@/lib/queries/rules";
-import { generatePersonalPdfHtml } from "@/lib/pdf";
+import { generatePersonalPdf } from "@/lib/pdf-generate";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -16,12 +16,12 @@ export async function GET(req: NextRequest) {
     session.user.category,
     persona
   );
-  const html = generatePersonalPdfHtml(rules);
+  const pdfBuffer = await generatePersonalPdf(rules);
 
-  return new NextResponse(html, {
+  return new NextResponse(new Uint8Array(pdfBuffer), {
     headers: {
-      "Content-Type": "text/html; charset=utf-8",
-      "Content-Disposition": 'attachment; filename="personalnye_resheniya.html"',
+      "Content-Type": "application/pdf",
+      "Content-Disposition": 'attachment; filename="personalnye_resheniya.pdf"',
     },
   });
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getAllRulesForPdf } from "@/lib/queries/rules";
-import { generateRulesPdfHtml } from "@/lib/pdf";
+import { generateRulesPdf } from "@/lib/pdf-generate";
 
 export async function GET() {
   const session = await auth();
@@ -11,12 +11,12 @@ export async function GET() {
 
   const isAdmin = session.user.groupName === "admin";
   const rules = await getAllRulesForPdf(isAdmin, session.user.category);
-  const html = generateRulesPdfHtml(rules);
+  const pdfBuffer = await generateRulesPdf(rules);
 
-  return new NextResponse(html, {
+  return new NextResponse(new Uint8Array(pdfBuffer), {
     headers: {
-      "Content-Type": "text/html; charset=utf-8",
-      "Content-Disposition": 'attachment; filename="pravila_migipa.html"',
+      "Content-Type": "application/pdf",
+      "Content-Disposition": 'attachment; filename="pravila_migipa.pdf"',
     },
   });
 }
