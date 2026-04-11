@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getRules } from "@/lib/queries/rules";
 import { getDecisionBodies, getAppliesTo, getPersonas } from "@/lib/queries/lookups";
+import { getAllDocumentsSummary } from "@/lib/queries/documents";
 import { PersonalWrapper } from "./personal-wrapper";
 
 export default async function PersonalPage() {
@@ -10,18 +11,16 @@ export default async function PersonalPage() {
 
   const isAdmin = session.user.groupName === "admin";
 
-  // Fetch ALL personal decisions once, including archived
-  const [rules, decisionBodies, categories, personas] = await Promise.all([
-    getRules({
-      groupId: 2,
-      showArchived: true,
-      isAdmin,
-      userCategory: session.user.category,
-    }),
-    getDecisionBodies(),
-    getAppliesTo(),
-    getPersonas(),
-  ]);
+  // Fetch data sequentially to avoid exhausting DB connection pool
+  const rules = await getRules({
+    groupId: 2,
+    showArchived: true,
+    isAdmin,
+    userCategory: session.user.category,
+  });
+  const [decisionBodies, categories] = await Promise.all([getDecisionBodies(), getAppliesTo()]);
+  const personas = await getPersonas();
+  const allDocuments = isAdmin ? await getAllDocumentsSummary() : [];
 
   return (
     <PersonalWrapper
@@ -32,6 +31,7 @@ export default async function PersonalPage() {
       isAdmin={isAdmin}
       userId={session.user.id}
       userCategory={session.user.category}
+      allDocuments={allDocuments}
     />
   );
 }

@@ -45,6 +45,20 @@ export async function getRules(filters: RuleFilters) {
       rule_applies_to: {
         include: { applies_to: true },
       },
+      rule_documents: {
+        include: {
+          document: {
+            select: {
+              id: true,
+              title: true,
+              file_name: true,
+              mime_type: true,
+              decision_date: true,
+              decision_body: { select: { id: true, code: true, name: true } },
+            },
+          },
+        },
+      },
     },
     orderBy: [
       { section_id: "asc" },

@@ -31,8 +31,12 @@ export async function createRule(data: {
   groupId: number;
   text: string;
   categoryIds: number[];
+  documentIds?: number[];
 }) {
   await requireAdmin();
+
+  // Shift subsequent rules to make room for the new one
+  const shiftedRuleUids = await shiftSubsequentRules(data);
 
   const rule = await prisma.rules.create({
     data: {
@@ -59,12 +63,83 @@ export async function createRule(data: {
     });
   }
 
-  // Trigger AI embedding
+  // Link documents
+  if (data.documentIds && data.documentIds.length > 0) {
+    await prisma.rule_documents.createMany({
+      data: data.documentIds.map((docId) => ({
+        rule_uid: rule.rule_uid,
+        document_id: docId,
+      })),
+    });
+  }
+
+  // Trigger AI embedding for the new rule
   await triggerAiEmbed(rule.rule_uid);
+
+  // Re-embed shifted rules (numbering changed in their content/metadata)
+  for (const uid of shiftedRuleUids) {
+    await prisma.$executeRaw`DELETE FROM rule_embeddings WHERE rule_uid = ${uid}`;
+    await triggerAiEmbed(uid);
+  }
 
   revalidatePath("/rules");
   revalidatePath("/personal");
   return rule;
+}
+
+async function shiftSubsequentRules(data: {
+  id: number;
+  subId: number;
+  sectionId: number;
+  ruleTypeId: number;
+  groupId: number;
+}): Promise<number[]> {
+  if (data.subId > 0) {
+    // Inserting a sub-item: shift sub_ids within the same section/type/id
+    const toShift = await prisma.rules.findMany({
+      where: {
+        section_id: data.sectionId,
+        rule_type_id: data.ruleTypeId,
+        group_id: data.groupId,
+        id: data.id,
+        sub_id: { gte: data.subId },
+        status_id: 1,
+      },
+      select: { rule_uid: true },
+      orderBy: { sub_id: "desc" },
+    });
+
+    for (const r of toShift) {
+      await prisma.rules.update({
+        where: { rule_uid: r.rule_uid },
+        data: { sub_id: { increment: 1 } },
+      });
+    }
+
+    return toShift.map((r) => r.rule_uid);
+  } else {
+    // Inserting a top-level item: shift ids within the same section/type
+    const toShift = await prisma.rules.findMany({
+      where: {
+        section_id: data.sectionId,
+        rule_type_id: data.ruleTypeId,
+        group_id: data.groupId,
+        id: { gte: data.id },
+        status_id: 1,
+      },
+      select: { rule_uid: true },
+      orderBy: { id: "desc" },
+    });
+
+    for (const r of toShift) {
+      await prisma.rules.update({
+        where: { rule_uid: r.rule_uid },
+        data: { id: { increment: 1 } },
+      });
+    }
+
+    return toShift.map((r) => r.rule_uid);
+  }
 }
 
 export async function createPersonalRule(data: {

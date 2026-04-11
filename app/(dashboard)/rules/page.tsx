@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getRules } from "@/lib/queries/rules";
 import { getSections, getRuleTypes, getDecisionBodies, getAppliesTo } from "@/lib/queries/lookups";
+import { getAllDocumentsSummary } from "@/lib/queries/documents";
 import { RulesWrapper } from "./rules-wrapper";
 
 export default async function RulesPage() {
@@ -10,20 +11,16 @@ export default async function RulesPage() {
 
   const isAdmin = session.user.groupName === "admin";
 
-  // Fetch ALL rules for group_id=1 once, including archived
-  const [rules, sections, ruleTypes, decisionBodies, categories] =
-    await Promise.all([
-      getRules({
-        groupId: 1,
-        showArchived: true,
-        isAdmin,
-        userCategory: session.user.category,
-      }),
-      getSections(),
-      getRuleTypes(),
-      getDecisionBodies(),
-      getAppliesTo(),
-    ]);
+  // Fetch data sequentially to avoid exhausting DB connection pool
+  const rules = await getRules({
+    groupId: 1,
+    showArchived: true,
+    isAdmin,
+    userCategory: session.user.category,
+  });
+  const [sections, ruleTypes] = await Promise.all([getSections(), getRuleTypes()]);
+  const [decisionBodies, categories] = await Promise.all([getDecisionBodies(), getAppliesTo()]);
+  const allDocuments = isAdmin ? await getAllDocumentsSummary() : [];
 
   return (
     <RulesWrapper
@@ -36,6 +33,7 @@ export default async function RulesPage() {
       groupId={1}
       userId={session.user.id}
       userCategory={session.user.category}
+      allDocuments={allDocuments}
     />
   );
 }

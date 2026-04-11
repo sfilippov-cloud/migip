@@ -11,6 +11,7 @@
   "dependencies": {
     "@n8n/chat": "^1.14.0",
     "@prisma/client": "^6.19.3",
+    "@tailwindcss/typography": "^0.5.19",
     "@types/node": "^25.2.3",
     "@types/react": "^19.2.14",
     "bcryptjs": "^3.0.3",
@@ -19,14 +20,17 @@
     "dotenv": "^17.4.1",
     "effect": "^3.21.0",
     "lucide-react": "^1.8.0",
+    "mammoth": "^1.12.0",
     "next": "^15.4.6",
     "next-auth": "^5.0.0-beta.30",
+    "pdf-parse": "^2.4.5",
     "prisma": "^6.19.3",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.2",

@@ -5,7 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
-import { BookOpen, User, Settings, LogOut } from "lucide-react";
+import { BookOpen, User, Settings, FileText, HelpCircle, LogOut } from "lucide-react";
 
 interface CategoryInfo {
   name: string | null;
@@ -27,7 +27,9 @@ const navItems = [
 ];
 
 const adminItems = [
+  { href: "/documents", label: "Документы", icon: FileText },
   { href: "/users", label: "Пользователи", icon: Settings },
+  { href: "/admin-guide", label: "Руководство", icon: HelpCircle },
 ];
 
 export function Sidebar({ user, selectedRuleCategories, onNavigate }: SidebarProps) {
@@ -88,7 +90,7 @@ export function Sidebar({ user, selectedRuleCategories, onNavigate }: SidebarPro
       </nav>
 
       {/* Доступно для: */}
-      {selectedRuleCategories && selectedRuleCategories.length > 0 && (
+      {isAdmin && (pathname === "/rules" || pathname === "/personal") && selectedRuleCategories && selectedRuleCategories.length > 0 && (
         <div className="border-t px-4 py-4">
           <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
             Доступно для:

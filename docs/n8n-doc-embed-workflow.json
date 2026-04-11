@@ -1,0 +1,253 @@
+{
+  "name": "Document Embeddings",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "ai-doc-embed",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [400, 0],
+      "id": "a1000001-0000-0000-0000-000000000001",
+      "name": "Doc Embed Webhook",
+      "webhookId": "ai-doc-embed"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "DELETE FROM document_embeddings WHERE document_id = {{ $json.query.document_id }};\n\nSELECT\n  d.id AS document_id,\n  d.title,\n  d.file_name,\n  d.extracted_text,\n  d.decision_date,\n  db.code AS decision_body_code,\n  db.name AS decision_body_name\nFROM uploaded_documents d\nLEFT JOIN decision_bodies db ON db.id = d.decision_body_id\nWHERE d.id = {{ $json.query.document_id }}\n  AND d.extracted_text IS NOT NULL;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [620, 0],
+      "id": "a1000001-0000-0000-0000-000000000002",
+      "name": "Get Document & Clear Old Embeddings",
+      "credentials": {
+        "postgres": {
+          "id": "CsDcSojUoZXb4PGJ",
+          "name": "Postgres MIGIP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "function formatDateDDMMYYYY(dateStr) {\n  if (!dateStr) return '';\n  const dt = new Date(dateStr);\n  if (Number.isNaN(dt.getTime())) return dateStr;\n  const dd = String(dt.getDate()).padStart(2, '0');\n  const mm = String(dt.getMonth() + 1).padStart(2, '0');\n  const yyyy = dt.getFullYear();\n  return `${dd}-${mm}-${yyyy}`;\n}\n\n// Split text into chunks of ~4000 chars, breaking at paragraph boundaries\nfunction chunkText(text, maxLen = 4000, overlap = 200) {\n  if (!text || text.length <= maxLen) return [text || ''];\n  const paragraphs = text.split(/\\n\\n+/);\n  const chunks = [];\n  let current = '';\n  for (const para of paragraphs) {\n    if (current.length + para.length + 2 > maxLen && current.length > 0) {\n      chunks.push(current.trim());\n      // Keep last `overlap` chars for context continuity\n      current = current.slice(-overlap) + '\\n\\n' + para;\n    } else {\n      current += (current ? '\\n\\n' : '') + para;\n    }\n  }\n  if (current.trim()) chunks.push(current.trim());\n  return chunks;\n}\n\nconst results = [];\nfor (const item of items) {\n  const d = item.json;\n  if (!d.extracted_text) continue;\n\n  const decisionDate = formatDateDDMMYYYY(d.decision_date);\n  const chunks = chunkText(d.extracted_text);\n\n  for (let i = 0; i < chunks.length; i++) {\n    const header =\n      'Document: ' + (d.title || '') + '\\n' +\n      'File: ' + (d.file_name || '') + '\\n' +\n      'Source: ' + (d.decision_body_code || '') + ' ' + (d.decision_body_name || '') +\n      (decisionDate ? ' от ' + decisionDate : '') + '\\n' +\n      (chunks.length > 1 ? 'Chunk: ' + (i + 1) + '/' + chunks.length + '\\n' : '') +\n      '\\n';\n\n    const content = header + chunks[i];\n\n    const metadata = {\n      document_id: d.document_id,\n      title: d.title,\n      file_name: d.file_name,\n      decision_body: d.decision_body_code || null,\n      decision_date: decisionDate || null,\n      chunk_index: i,\n      total_chunks: chunks.length,\n    };\n\n    results.push({\n      json: {\n        document_id: d.document_id,\n        chunk_index: i,\n        content,\n        metadata,\n      },\n    });\n  }\n}\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [840, 0],
+      "id": "a1000001-0000-0000-0000-000000000003",
+      "name": "Chunk Text & Build Content",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1060, 0],
+      "id": "a1000001-0000-0000-0000-000000000004",
+      "name": "Loop Over Chunks"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/embeddings",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "text-embedding-3-small"
+            },
+            {
+              "name": "input",
+              "value": "={{ $json.content }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1280, 0],
+      "id": "a1000001-0000-0000-0000-000000000005",
+      "name": "OpenAI Embedding",
+      "alwaysOutputData": true,
+      "credentials": {
+        "openAiApi": {
+          "id": "zCUcjAAyvecpCUeK",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const d = item.json;\n  const embedding = d.data[0].embedding;\n  const loopItem = $('Loop Over Chunks').first().json;\n  return {\n    json: {\n      document_id: loopItem.document_id,\n      chunk_index: loopItem.chunk_index,\n      content: loopItem.content,\n      metadata: loopItem.metadata,\n      embedding,\n    },\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1500, 0],
+      "id": "a1000001-0000-0000-0000-000000000006",
+      "name": "Combine Embedding"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO document_embeddings (document_id, chunk_index, content, metadata, embedding)\nVALUES ($1, $2, $3, $4::jsonb, $5::vector)\nON CONFLICT (document_id, chunk_index) DO UPDATE\nSET\n  content   = EXCLUDED.content,\n  metadata  = EXCLUDED.metadata,\n  embedding = EXCLUDED.embedding;",
+        "options": {
+          "queryReplacement": "={{ [\n  $json.document_id,\n  $json.chunk_index,\n  $json.content,\n  JSON.stringify($json.metadata),\n  JSON.stringify($json.embedding)\n] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [1720, 0],
+      "id": "a1000001-0000-0000-0000-000000000007",
+      "name": "Upsert Embedding",
+      "credentials": {
+        "postgres": {
+          "id": "CsDcSojUoZXb4PGJ",
+          "name": "Postgres MIGIP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE uploaded_documents SET status = 'ready' WHERE id = {{ $('Loop Over Chunks').first().json.document_id }};",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [1720, 220],
+      "id": "a1000001-0000-0000-0000-000000000008",
+      "name": "Update Status to Ready",
+      "credentials": {
+        "postgres": {
+          "id": "CsDcSojUoZXb4PGJ",
+          "name": "Postgres MIGIP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, document_id: $('Doc Embed Webhook').first().json.query.document_id } }}"
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1940, 220],
+      "id": "a1000001-0000-0000-0000-000000000009",
+      "name": "Respond OK"
+    }
+  ],
+  "connections": {
+    "Doc Embed Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get Document & Clear Old Embeddings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Document & Clear Old Embeddings": {
+      "main": [
+        [
+          {
+            "node": "Chunk Text & Build Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chunk Text & Build Content": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Chunks": {
+      "main": [
+        [
+          {
+            "node": "Update Status to Ready",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OpenAI Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Embedding": {
+      "main": [
+        [
+          {
+            "node": "Combine Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Embedding": {
+      "main": [
+        [
+          {
+            "node": "Upsert Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Embedding": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Status to Ready": {
+      "main": [
+        [
+          {
+            "node": "Respond OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f64c7e1c906348719a1c2491726e3f92df165610773b74cc124e42a8fe8b6602"
+  }
+}

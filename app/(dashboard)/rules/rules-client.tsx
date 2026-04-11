@@ -6,7 +6,8 @@ import { formatDate } from "@/lib/utils";
 import { deleteRule, toggleArchive } from "@/lib/actions/rules";
 import { RuleDialog } from "@/components/rule-dialog";
 import { AiPanel } from "@/components/ai-panel";
-import { Pencil, Sparkles, ChevronLeft, ChevronRight, X, Plus, Download } from "lucide-react";
+import { DocPreviewPanel } from "@/components/doc-preview-panel";
+import { Pencil, Sparkles, ChevronLeft, ChevronRight, X, Plus, Download, FileText } from "lucide-react";
 import { toast } from "sonner";
 
 type Rule = {
@@ -32,12 +33,30 @@ type Rule = {
     applies_to_id: number;
     applies_to: { id: number; name: string | null; description: string | null };
   }[];
+  rule_documents?: {
+    document: {
+      id: number;
+      title: string;
+      file_name: string;
+      mime_type: string;
+      decision_date: Date | null;
+      decision_body: { id: number; code: string | null; name: string } | null;
+    };
+  }[];
 };
 
 type Section = { id: number; name: string | null };
 type RuleType = { id: number; name: string | null };
 type DecisionBody = { id: number; code: string | null; name: string | null };
 type Category = { id: number; name: string | null; description: string | null };
+
+type DocumentSummary = {
+  id: number;
+  title: string;
+  file_name: string;
+  decision_date: Date | null;
+  decision_body: { id: number; code: string | null; name: string } | null;
+};
 
 interface RulesClientProps {
   allRules: Rule[];
@@ -49,6 +68,7 @@ interface RulesClientProps {
   groupId: number;
   userId: string;
   userCategory?: number | null;
+  allDocuments?: DocumentSummary[];
   onSelectRule?: (rule: Rule | null) => void;
 }
 
@@ -62,6 +82,7 @@ export function RulesClient({
   groupId,
   userId,
   userCategory,
+  allDocuments,
   onSelectRule,
 }: RulesClientProps) {
   const router = useRouter();
@@ -70,6 +91,36 @@ export function RulesClient({
   const [selectedRule, setSelectedRule] = useState<Rule | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<{
+    id: number; title: string; fileName: string; mimeType: string;
+  } | null>(null);
+
+  function closeAllPanels() {
+    setEditingRule(null);
+    setShowAddDialog(false);
+    setShowAiPanel(false);
+    setPreviewDoc(null);
+  }
+
+  function openEditRule(rule: Rule) {
+    closeAllPanels();
+    setEditingRule(rule);
+  }
+
+  function openAddDialog() {
+    closeAllPanels();
+    setShowAddDialog(true);
+  }
+
+  function openAiPanel() {
+    closeAllPanels();
+    setShowAiPanel(true);
+  }
+
+  function openDocPreview(doc: { id: number; title: string; fileName: string; mimeType: string }) {
+    closeAllPanels();
+    setPreviewDoc(doc);
+  }
 
   function selectRule(rule: Rule) {
     const next = selectedRule?.rule_uid === rule.rule_uid ? null : rule;
@@ -146,7 +197,7 @@ export function RulesClient({
         <div className="flex items-center gap-2">
           {isAdmin && (
             <button
-              onClick={() => setShowAddDialog(true)}
+              onClick={() => openAddDialog()}
               className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
               title="Добавить"
             >
@@ -162,7 +213,7 @@ export function RulesClient({
             <Download className="h-4 w-4" /> <span className="hidden md:inline">PDF</span>
           </a>
           <button
-            onClick={() => setShowAiPanel((v) => !v)}
+            onClick={() => showAiPanel ? setShowAiPanel(false) : openAiPanel()}
             className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium ${showAiPanel ? "border-primary bg-primary/5 text-primary" : "hover:bg-gray-50"}`}
             title="Спросить ИИ"
           >
@@ -260,9 +311,22 @@ export function RulesClient({
                         {rule.status_id === 2 && (
                           <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">Архив</span>
                         )}
+                        {isAdmin && rule.rule_documents && rule.rule_documents.length > 0 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const doc = rule.rule_documents![0].document;
+                              openDocPreview({ id: doc.id, title: doc.title, fileName: doc.file_name, mimeType: doc.mime_type });
+                            }}
+                            className="rounded p-1 text-blue-400 hover:text-blue-600"
+                            title={`Документы (${rule.rule_documents.length})`}
+                          >
+                            <FileText className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                         {isAdmin && (
                           <button
-                            onClick={(e) => { e.stopPropagation(); setEditingRule(rule); }}
+                            onClick={(e) => { e.stopPropagation(); openEditRule(rule); }}
                             className="rounded p-1 text-gray-400 hover:text-gray-700"
                           >
                             <Pencil className="h-3.5 w-3.5" />
@@ -314,6 +378,8 @@ export function RulesClient({
           categories={categories}
           groupId={groupId}
           isAdmin={isAdmin}
+          linkedDocuments={editingRule.rule_documents?.map((rd) => rd.document)}
+          allDocuments={allDocuments}
           onClose={handleDialogClose}
         />
       )}
@@ -328,8 +394,11 @@ export function RulesClient({
           categories={categories}
           groupId={groupId}
           isAdmin={isAdmin}
-          defaultSectionId={sectionId || undefined}
-          defaultTypeId={typeId || undefined}
+          defaultSectionId={selectedRule?.section_id ?? (sectionId || undefined)}
+          defaultTypeId={selectedRule?.rule_type_id ?? (typeId || undefined)}
+          defaultId={selectedRule ? (selectedRule.sub_id && selectedRule.sub_id > 0 ? selectedRule.id ?? 0 : (selectedRule.id ?? 0) + 1) : undefined}
+          defaultSubId={selectedRule ? (selectedRule.sub_id && selectedRule.sub_id > 0 ? selectedRule.sub_id + 1 : 0) : undefined}
+          allDocuments={allDocuments}
           onClose={handleDialogClose}
         />
       )}
@@ -344,14 +413,33 @@ export function RulesClient({
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="flex-1">
+            <div className="min-h-0 flex-1 overflow-hidden">
               <AiPanel userId={userId} userType={isAdmin ? "public" : String(userCategory ?? "public")} />
             </div>
           </div>
-          <div className="hidden shrink-0 overflow-hidden rounded-lg border lg:block lg:w-[400px]">
-            <AiPanel userId={userId} userType={isAdmin ? "public" : String(userCategory ?? "public")} />
+          <div className="hidden shrink-0 flex-col overflow-hidden rounded-lg border lg:flex lg:w-[400px]">
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <span className="text-sm font-semibold">ИИ Ассистент</span>
+              <button onClick={() => setShowAiPanel(false)} className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <AiPanel userId={userId} userType={isAdmin ? "public" : String(userCategory ?? "public")} />
+            </div>
           </div>
         </>
+      )}
+
+      {/* Document Preview Panel */}
+      {previewDoc && (
+        <DocPreviewPanel
+          documentId={previewDoc.id}
+          title={previewDoc.title}
+          fileName={previewDoc.fileName}
+          mimeType={previewDoc.mimeType}
+          onClose={() => setPreviewDoc(null)}
+        />
       )}
       </div>
     </div>
