@@ -201,7 +201,8 @@ export function RuleDialog({
     }));
   }
 
-  const title = mode === "add" ? "Добавить правило" : "Редактировать правило";
+  const entityName = groupId === 2 ? "решение" : "правило";
+  const title = mode === "add" ? `Добавить ${entityName}` : `Редактировать ${entityName}`;
 
   const formContent = (
     <>
