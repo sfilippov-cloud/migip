@@ -40,7 +40,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
 
   return (
     <DashboardContext.Provider value={{ setSelectedCategories: handleSetCategories }}>
-      <div className="flex h-dvh">
+      <div className="fixed inset-0 flex overflow-hidden">
         {/* Mobile overlay */}
         {sidebarOpen && (
           <div
