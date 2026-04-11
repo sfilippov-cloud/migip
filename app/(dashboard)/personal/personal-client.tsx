@@ -303,8 +303,8 @@ export function PersonalClient({
       {/* AI Panel — fullscreen on mobile, side panel on desktop */}
       {showAiPanel && (
         <>
-          <div className="fixed inset-0 z-50 flex flex-col bg-white lg:hidden">
-            <div className="flex items-center justify-between border-b px-4 py-3">
+          <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-white lg:hidden">
+            <div className="flex shrink-0 items-center justify-between border-b px-4 py-3">
               <span className="text-sm font-semibold">ИИ Ассистент</span>
               <button onClick={() => setShowAiPanel(false)} className="rounded p-1.5 hover:bg-gray-100">
                 <X className="h-5 w-5" />
