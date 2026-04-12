@@ -296,12 +296,72 @@ export async function toggleArchive(ruleUid: number, currentStatusId: number) {
 export async function deleteRule(ruleUid: number) {
   await requireAdmin();
 
+  // Fetch the rule before deleting to know its position
+  const rule = await prisma.rules.findUnique({
+    where: { rule_uid: ruleUid },
+    select: { id: true, sub_id: true, section_id: true, rule_type_id: true, group_id: true },
+  });
+
   // Delete embeddings first (no FK cascade, uses vector type)
   await prisma.$executeRaw`DELETE FROM rule_embeddings WHERE rule_uid = ${ruleUid}`;
   // rule_applies_to cascades via FK, but delete explicitly to be safe
   await prisma.rule_applies_to.deleteMany({ where: { rule_uid: ruleUid } });
   // Delete the rule
   await prisma.rules.delete({ where: { rule_uid: ruleUid } });
+
+  // Shift subsequent rules down to fill the gap
+  if (rule && rule.id != null && rule.section_id != null && rule.rule_type_id != null) {
+    let toShift: { rule_uid: number }[];
+
+    if (rule.sub_id && rule.sub_id > 0) {
+      // Deleted a sub-item: shift subsequent sub_ids within the same item
+      toShift = await prisma.rules.findMany({
+        where: {
+          section_id: rule.section_id,
+          rule_type_id: rule.rule_type_id,
+          group_id: rule.group_id,
+          id: rule.id,
+          sub_id: { gt: rule.sub_id },
+          status_id: 1,
+        },
+        select: { rule_uid: true },
+        orderBy: { sub_id: "asc" },
+      });
+
+      for (const r of toShift) {
+        await prisma.rules.update({
+          where: { rule_uid: r.rule_uid },
+          data: { sub_id: { decrement: 1 } },
+        });
+      }
+    } else {
+      // Deleted a top-level item: shift subsequent ids within the subsection
+      toShift = await prisma.rules.findMany({
+        where: {
+          section_id: rule.section_id,
+          rule_type_id: rule.rule_type_id,
+          group_id: rule.group_id,
+          id: { gt: rule.id },
+          status_id: 1,
+        },
+        select: { rule_uid: true },
+        orderBy: { id: "asc" },
+      });
+
+      for (const r of toShift) {
+        await prisma.rules.update({
+          where: { rule_uid: r.rule_uid },
+          data: { id: { decrement: 1 } },
+        });
+      }
+    }
+
+    // Re-embed shifted rules (their rule_number changed)
+    for (const r of toShift) {
+      await prisma.$executeRaw`DELETE FROM rule_embeddings WHERE rule_uid = ${r.rule_uid}`;
+      await triggerAiEmbed(r.rule_uid);
+    }
+  }
 
   revalidatePath("/rules");
   revalidatePath("/personal");
