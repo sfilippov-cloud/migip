@@ -16,10 +16,6 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "MIGIP",
   description: "Система управления правилами МИГИП",
-  icons: {
-    icon: "/migip_logo.png",
-    apple: "/migip_logo.png",
-  },
 };
 
 export default function RootLayout({
